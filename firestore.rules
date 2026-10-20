@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// MindTrack Firestore rules.
+// Everyone can only touch their own data under users/{uid}. Everything else is denied.
+// Deploy with:  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validCheckIn(data, id) {
+      return data.keys().hasOnly(['date', 'mood', 'stress', 'energy', 'journal', 'tags', 'updatedAt'])
+        && data.date == id
+        && data.mood is int && data.mood >= 1 && data.mood <= 5
+        && data.stress is int && data.stress >= 1 && data.stress <= 5
+        && data.energy is int && data.energy >= 1 && data.energy <= 5
+        && data.journal is string && data.journal.size() <= 2000
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 6))
+        && data.updatedAt is int;
+    }
+
+    function validProfile(data) {
+      return data.keys().hasOnly(['displayName', 'email', 'updatedAt'])
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.email is string && data.email.size() <= 320
+        && data.updatedAt is int;
+    }
+
+    match /users/{userId} {
+      allow read, delete: if signedInAs(userId);
+      allow create, update: if signedInAs(userId) && validProfile(request.resource.data);
+
+      match /checkIns/{date} {
+        allow read, delete: if signedInAs(userId);
+        allow create, update: if signedInAs(userId) && validCheckIn(request.resource.data, date);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

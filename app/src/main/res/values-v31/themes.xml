@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MindTrack" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/mindtrack_night</item>
+        <!-- Skip the system icon splash; the app opens straight into its own animation. -->
+        <item name="android:windowSplashScreenBackground">@color/mindtrack_night</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+    </style>
+</resources>

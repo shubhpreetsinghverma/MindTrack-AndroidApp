@@ -120,7 +120,7 @@ internal class MindTrackViewModel(app: Application, private val uid: String?) : 
         settingsPrefs(getApplication()).edit { putString(KEY_LAST_CHECKIN, date) }
         recordCheckInTime(settingsPrefs(getApplication()), java.time.LocalTime.now())
         ReminderScheduler.rescheduleFromSettings(getApplication())
-        if (CrisisSupport.needsSupport(note)) showSupport = true
+        if (CrisisSupport.needsAnySupport(note)) showSupport = true
         checkedIn = true
         refresh()
         pushAfterChange(date, tr("Check-in saved on this device and synced to your account."))
@@ -134,7 +134,7 @@ internal class MindTrackViewModel(app: Application, private val uid: String?) : 
             journal.value = cleanNote
             tags = newTags
         }
-        if (CrisisSupport.needsSupport(cleanNote)) showSupport = true
+        if (CrisisSupport.needsAnySupport(cleanNote)) showSupport = true
         refresh()
         pushAfterChange(date, tr("Entry updated and synced to your account."))
     }
@@ -144,7 +144,7 @@ internal class MindTrackViewModel(app: Application, private val uid: String?) : 
         if (!canBackfill(date, today(), allRecords.map { it.date }.toSet())) return false
         val cleanNote = note.trim().take(2000)
         repo.save(CheckInRecord(date.toString(), mood.coerceIn(1, 5), stress.coerceIn(1, 5), energy.coerceIn(1, 5), cleanNote, tags.take(MAX_TAGS)))
-        if (CrisisSupport.needsSupport(cleanNote)) showSupport = true
+        if (CrisisSupport.needsAnySupport(cleanNote)) showSupport = true
         refresh()
         pushAfterChange(date.toString(), tr("Entry added and synced to your account."))
         return true
@@ -225,22 +225,23 @@ internal class MindTrackViewModel(app: Application, private val uid: String?) : 
 internal class CompanionViewModel(app: Application, uid: String?) : AndroidViewModel(app) {
 
     private val quota = AiQuota.forContext(app)
-    private val store = ChatStore.forUser(app, uid)
+    private val store = ConversationStore.forUser(app, uid)
     private var companion = GeminiCompanion(quota)
     private var checkInContext = ""
     private var job: Job? = null
 
-    /** The welcome message first, then whatever was said in the last 7 days (kept on this device only). */
+    /** The welcome message first, then the messages of the chat that is open. */
     val messages = mutableStateListOf<ChatMessage>()
     var isSending by mutableStateOf(false)
         private set
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    /** How many messages the companion remembers, and since when. */
-    var memoryCount by mutableIntStateOf(0)
-        private set
-    var memorySince by mutableStateOf<Long?>(null)
+    /** Saved chats for the sidebar, newest first. They live on this device and are deleted 7 days after the last message. */
+    val conversations = mutableStateListOf<ConversationSummary>()
+
+    /** The saved chat that is open, or null for a new chat that has no messages yet. */
+    var currentId by mutableStateOf<String?>(null)
         private set
 
     /** Estimated companion messages left today, and when they refresh. Both are estimates. */
@@ -249,47 +250,86 @@ internal class CompanionViewModel(app: Application, uid: String?) : AndroidViewM
     var resetLabel by mutableStateOf(quota.resetLabel())
         private set
 
+    // Declared before init: opening a saved chat in init sets it.
+    /** The last message that failed to send, so it can be retried without typing it again. */
+    var failedMessage by mutableStateOf<String?>(null)
+        private set
+
     init {
         messages.add(welcomeMessage())
-        restore()
+        // Pick up where the person left off: the most recent chat opens first.
+        val all = store.loadAll()
+        showList(all)
+        all.firstOrNull()?.let { show(it) }
     }
 
-    private fun restore() {
-        val saved = store.load()
-        messages.addAll(saved)
-        companion.restoreHistory(toMemoryTurns(saved))
-        updateMemoryInfo()
+    private fun showList(all: List<Conversation>) {
+        conversations.clear()
+        conversations.addAll(all.map { it.summary() })
     }
 
-    private fun updateMemoryInfo() {
-        val real = messages.filter { !it.isWelcome }
-        memoryCount = real.size
-        memorySince = real.minOfOrNull { it.time }
+    private fun refreshConversations() = showList(store.loadAll())
+
+    private fun show(conversation: Conversation) {
+        currentId = conversation.id
+        messages.clear()
+        messages.add(welcomeMessage())
+        messages.addAll(conversation.messages)
+        companion = GeminiCompanion(quota, checkInContext)
+        companion.restoreHistory(toMemoryTurns(conversation.messages))
+        errorMessage = null
+        failedMessage = null
+    }
+
+    /** Back to an empty chat. Anything already said stays saved in its own chat. */
+    private fun startBlank() {
+        currentId = null
+        companion = GeminiCompanion(quota, checkInContext)
+        messages.clear()
+        messages.add(welcomeMessage())
+        errorMessage = null
+        failedMessage = null
     }
 
     private fun persist() {
-        store.save(messages)
-        updateMemoryInfo()
+        val real = messages.filter { !it.isWelcome }
+        if (real.isNotEmpty()) {
+            val id = currentId ?: real.minOf { it.time }.toString().also { currentId = it }
+            store.save(Conversation(id, real))
+        }
+        refreshConversations()
     }
 
-    /** Call when the app returns to the foreground: anything older than a week is deleted. */
+    /** Call when the app returns to the foreground: chats whose last message is over a week old are deleted. */
     fun onResume() {
-        val kept = pruneExpired(messages, System.currentTimeMillis())
-        if (kept.size != messages.count { !it.isWelcome } && !isSending) {
-            messages.removeAll { !it.isWelcome && it !in kept }
-            companion.restoreHistory(toMemoryTurns(kept))
-            persist()
-        }
+        refreshConversations()
+        val id = currentId
+        if (id != null && !isSending && conversations.none { it.id == id }) startBlank()
+    }
+
+    fun openConversation(id: String) {
+        if (isSending || id == currentId) return
+        store.loadAll().firstOrNull { it.id == id }?.let { show(it) }
+    }
+
+    fun deleteConversation(id: String) {
+        if (id == currentId) { job?.cancel(); isSending = false; startBlank() }
+        store.delete(id)
+        refreshConversations()
+    }
+
+    fun deleteAllConversations() {
+        job?.cancel()
+        isSending = false
+        store.clearAll()
+        startBlank()
+        refreshConversations()
     }
 
     fun refreshQuota() {
         remaining = quota.remaining()
         resetLabel = quota.resetLabel()
     }
-
-    /** The last message that failed to send, so it can be retried without typing it again. */
-    var failedMessage by mutableStateOf<String?>(null)
-        private set
 
     fun updateContext(records: List<CheckInRecord>, streak: Int) {
         checkInContext = buildCompanionContext(records, streak)
@@ -303,6 +343,8 @@ internal class CompanionViewModel(app: Application, uid: String?) : AndroidViewM
         if (CrisisSupport.needsSupport(message)) {
             // Always show real-world help, whatever the AI replies.
             messages.add(ChatMessage("MindTrack", CrisisSupport.chatMessage, false))
+        } else if (CrisisSupport.needsAbuseSupport(message)) {
+            messages.add(ChatMessage("MindTrack", CrisisSupport.abuseChatMessage, false))
         } else {
             // "hi", "thanks" and the like are answered here, so they cost no AI quota.
             trivialReply(message)?.let { reply ->
@@ -321,41 +363,23 @@ internal class CompanionViewModel(app: Application, uid: String?) : AndroidViewM
         request(message)
     }
 
-    /** Forgets this device's copy of the conversation and starts fresh. */
-    private fun forget() {
-        store.clear()
-        companion = GeminiCompanion(quota, checkInContext)
-        messages.clear()
-        messages.add(welcomeMessage())
-        errorMessage = null
-        failedMessage = null
-        updateMemoryInfo()
-    }
-
     fun newChat() {
         if (isSending) return
-        forget()
+        startBlank()
     }
 
-    /** "Forget everything" in Profile. */
-    fun clearMemory() {
-        job?.cancel()
-        isSending = false
-        forget()
-    }
-
-    /** On sign-out: clear what is in memory only. The saved copy stays for the next sign-in of this account. */
+    /** On sign-out: clear what is in memory only. The saved chats stay for the next sign-in of this account. */
     fun wipe() {
         job?.cancel()
         companion = GeminiCompanion(quota)
         checkInContext = ""
         messages.clear()
         messages.add(welcomeMessage())
+        conversations.clear()
+        currentId = null
         isSending = false
         errorMessage = null
         failedMessage = null
-        memoryCount = 0
-        memorySince = null
     }
 
     private fun request(message: String) {

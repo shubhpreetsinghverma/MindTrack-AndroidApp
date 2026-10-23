@@ -1,5 +1,11 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -40,11 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun CompanionScreen(
+internal fun CompanionChat(
     vm: CompanionViewModel,
     records: List<CheckInRecord>,
     streak: Int,
-    onOpenExercises: () -> Unit = {}
+    onOpenExercises: () -> Unit = {},
+    onOpenSidebar: () -> Unit = {}
 ) {
     var message by remember { mutableStateOf("") }
     val messages = vm.messages
@@ -78,6 +85,19 @@ internal fun CompanionScreen(
             .padding(horizontal = 18.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+            // Three short lines: the chat history lives behind this, like the sidebar in Claude.
+            Box(
+                Modifier.padding(top = 4.dp, end = 12.dp).size(42.dp).clip(RoundedCornerShape(14.dp)).background(SurfaceElevated)
+                    .semantics { contentDescription = tr("Chat history") }
+                    .clickable(role = Role.Button, onClick = onOpenSidebar),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.Start) {
+                    Box(Modifier.size(width = 18.dp, height = 2.dp).clip(CircleShape).background(Lavender))
+                    Box(Modifier.size(width = 12.dp, height = 2.dp).clip(CircleShape).background(Lavender))
+                    Box(Modifier.size(width = 18.dp, height = 2.dp).clip(CircleShape).background(Lavender))
+                }
+            }
             Box(Modifier.weight(1f)) {
                 ScreenHeader(
                     eyebrow = tr("A SPACE WITHOUT JUDGEMENT"),
@@ -85,11 +105,11 @@ internal fun CompanionScreen(
                     subtitle = tr("Sometimes it helps to put things into words.")
                 )
             }
-            if (messages.size > 1) {
-                TextButton(onClick = { vm.newChat() }, enabled = !vm.isSending) {
-                    Text(tr("New chat"), color = if (vm.isSending) TextSecondary else Lavender, fontSize = 12.sp)
-                }
-            }
+            PixelMoon(
+                size = 34.dp,
+                mood = if (vm.isSending) MoonMood.HAPPY else MoonMood.SLEEPY,
+                modifier = Modifier.padding(top = 6.dp).clearAndSetSemantics {}
+            )
         }
 
         Spacer(Modifier.height(15.dp))
@@ -148,34 +168,40 @@ internal fun CompanionScreen(
             )
         }
 
+        val canSend = message.isNotBlank() && !vm.isSending && !outOfMessages
+        val sendNow = {
+            val text = message.trim()
+            if (text.isNotEmpty() && !vm.isSending) {
+                message = ""
+                vm.send(text)
+            }
+        }
         OutlinedTextField(
             value = message,
             onValueChange = { if (it.length <= 2000) message = it },
             modifier = Modifier.fillMaxWidth(),
             enabled = !vm.isSending && !outOfMessages,
             placeholder = { Text(tr("What's on your mind?"), color = TextSecondary) },
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = quietFieldColors(),
             maxLines = 4,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-        )
-
-        Spacer(Modifier.height(9.dp))
-
-        Button(
-            onClick = {
-                val text = message.trim()
-                if (text.isNotEmpty() && !vm.isSending) {
-                    message = ""
-                    vm.send(text)
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            trailingIcon = {
+                Box(
+                    Modifier
+                        .padding(end = 8.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (canSend) Lavender else SurfaceElevated)
+                        .semantics { contentDescription = tr("Send message") }
+                        .clickable(enabled = canSend, role = Role.Button, onClick = sendNow),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("↑", color = if (canSend) Background else TextSecondary, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clearAndSetSemantics {})
                 }
-            },
-            enabled = message.isNotBlank() && !vm.isSending && !outOfMessages,
-            modifier = Modifier.fillMaxWidth().height(51.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Lavender, contentColor = Background)
-        ) {
-            Text(if (vm.isSending) tr("Thinking…") else tr("Send message  →"), fontWeight = FontWeight.Bold)
-        }
+            }
+        )
 
         Spacer(Modifier.height(8.dp))
 
@@ -195,35 +221,23 @@ internal fun ChatBubble(chat: ChatMessage) {
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
         horizontalAlignment = if (chat.isUser) Alignment.End else Alignment.Start
     ) {
-        Text(tr(chat.sender), color = Lavender, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text(tr(chat.sender).uppercase(), color = TextSecondary, style = PixelLabelStyle)
 
         Spacer(Modifier.height(5.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = if (chat.isUser) Arrangement.End else Arrangement.Start
-        ) {
+        if (chat.isUser) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.88f)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 19.dp,
-                            topEnd = 19.dp,
-                            bottomStart = if (chat.isUser) 19.dp else 5.dp,
-                            bottomEnd = if (chat.isUser) 5.dp else 19.dp
-                        )
-                    )
-                    .background(if (chat.isUser) SurfaceSelected else SurfaceColor)
-                    .padding(15.dp)
+                    .fillMaxWidth(0.84f)
+                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 5.dp))
+                    .background(TextPrimary)
+                    .padding(horizontal = 15.dp, vertical = 12.dp)
             ) {
-                if (chat.isUser) {
-                    Text(chat.text, color = TextPrimary, fontSize = 14.sp, lineHeight = 21.sp)
-                } else {
-                    val rendered = remember(chat.text) { markdownToAnnotated(chat.text, Lavender) }
-                    Text(rendered, color = TextPrimary, fontSize = 14.sp, lineHeight = 21.sp)
-                }
+                Text(chat.text, color = Background, fontSize = 14.sp, lineHeight = 21.sp)
             }
+        } else {
+            val rendered = remember(chat.text) { markdownToAnnotated(chat.text, Lavender) }
+            Text(rendered, color = TextPrimary, fontSize = 15.sp, lineHeight = 23.sp, modifier = Modifier.fillMaxWidth(0.94f))
         }
     }
 }

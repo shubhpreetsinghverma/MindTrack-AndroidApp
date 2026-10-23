@@ -34,6 +34,7 @@ internal object ReportExporter {
         name: String
     ): File {
         val stats = buildReportStats(records) ?: error("There are no check-ins to export.")
+        reportPixelFont = runCatching { androidx.core.content.res.ResourcesCompat.getFont(context, R.font.pixelify_sans) }.getOrNull()
 
         // First pass only counts pages, so the footer can say "Page 2 of 5".
         val counter = ReportRenderer(stats, includeNotes, name, totalPages = 0)
@@ -68,14 +69,18 @@ private const val MARGIN = 44f
 private const val CONTENT_W = PAGE_W - 2 * MARGIN
 private const val BOTTOM_LIMIT = PAGE_H - 58f
 
-private val INK = Color.parseColor("#1B1F3B")
-private val MUTED = Color.parseColor("#5B6180")
-private val ACCENT = Color.parseColor("#6B58C9")
-private val ACCENT_SOFT = Color.parseColor("#F3F0FF")
-private val BORDER = Color.parseColor("#DDD8F2")
-private val GRID = Color.parseColor("#E8E6F2")
-private val STRESS_COLOR = Color.parseColor("#D9822B")
-private val ENERGY_COLOR = Color.parseColor("#2E9C8A")
+/** Set while a report is being made, so the small labels use the app's pixel font. */
+private var reportPixelFont: Typeface? = null
+
+private val INK = Color.parseColor("#1C1C1C")
+private val MUTED = Color.parseColor("#585858")
+private val ACCENT = Color.parseColor("#6B5FB3")
+private val ACCENT_SOFT = Color.parseColor("#F1EEE6")
+private val PAPER = Color.parseColor("#FBFAF6")
+private val BORDER = Color.parseColor("#B4B4B4")
+private val GRID = Color.parseColor("#DEDEDE")
+private val STRESS_COLOR = Color.parseColor("#B5651D")
+private val ENERGY_COLOR = Color.parseColor("#2F7D6B")
 private val MOOD_COLORS = mapOf(
     1 to Color.parseColor("#D9667A"), 2 to Color.parseColor("#E49A6B"), 3 to Color.parseColor("#E2C15A"),
     4 to Color.parseColor("#7FC59A"), 5 to Color.parseColor("#4DAF86")
@@ -89,7 +94,27 @@ private fun one(v: Double) = String.format(Locale.ENGLISH, "%.1f", v)
 private fun tp(color: Int, size: Float, style: Int = Typeface.NORMAL) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
     this.color = color
     textSize = size
-    typeface = Typeface.create(Typeface.SANS_SERIF, style)
+    // Android has no Times New Roman; its serif family is the closest built-in match.
+    typeface = Typeface.create(Typeface.SERIF, style)
+}
+
+/** Small wide-spaced labels, in a monospace face to echo the app's pixel labels. */
+private fun mono(color: Int, size: Float, style: Int = Typeface.NORMAL) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+    this.color = color
+    textSize = size
+    letterSpacing = 0.12f
+    typeface = reportPixelFont ?: Typeface.create(Typeface.MONOSPACE, style)
+}
+
+/** The app's little pixel moon, drawn from the same cells the screens use. */
+private fun drawPixelMoon(canvas: Canvas, left: Float, top: Float, size: Float) {
+    val cell = size / 12f
+    val body = fill(Color.parseColor("#8E83C9"))
+    moonCells.forEach { (x, y) -> canvas.drawRect(left + x * cell, top + y * cell, left + (x + 1) * cell, top + (y + 1) * cell, body) }
+    val ink = fill(Color.parseColor("#2A2733"))
+    moonEye(MoonMood.SLEEPY).forEach { (x, y) -> canvas.drawRect(left + x * cell, top + y * cell, left + (x + 1) * cell, top + (y + 1) * cell, ink) }
+    val blush = fill(Color.parseColor("#F2A6B8"))
+    canvas.drawRect(left + 2 * cell, top + 8 * cell, left + 3 * cell, top + 9 * cell, blush)
 }
 
 private fun fill(color: Int, alpha: Int = 255) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -115,8 +140,8 @@ private class ReportRenderer(
 
     private val body = tp(INK, 10.5f)
     private val small = tp(MUTED, 9f)
-    private val label = tp(MUTED, 9f, Typeface.BOLD)
-    private val h1 = tp(INK, 15f, Typeface.BOLD)
+    private val label = mono(MUTED, 8.5f)
+    private val h1 = tp(ACCENT, 15f, Typeface.BOLD)
 
     fun close() = doc.close()
     fun writeTo(out: java.io.OutputStream) = doc.writeTo(out)
@@ -145,12 +170,15 @@ private class ReportRenderer(
         pageNo++
         page = doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, pageNo).create())
         canvas = page!!.canvas
+        canvas.drawColor(PAPER)
         if (first) {
             y = MARGIN
         } else {
-            canvas.drawText("MindTrack", MARGIN, 34f, tp(ACCENT, 10f, Typeface.BOLD))
-            canvas.drawText("Wellbeing report", MARGIN + 58f, 34f, tp(MUTED, 10f))
-            canvas.drawLine(MARGIN, 42f, PAGE_W - MARGIN, 42f, stroke(BORDER, 0.8f))
+            drawPixelMoon(canvas, MARGIN, 20f, 16f)
+            canvas.drawText("MINDTRACK", MARGIN + 22f, 33f, mono(ACCENT, 9.5f, Typeface.BOLD))
+            val rightHead = mono(MUTED, 9f).apply { textAlign = Paint.Align.RIGHT }
+            canvas.drawText("WELLBEING REPORT", PAGE_W - MARGIN, 33f, rightHead)
+            canvas.drawLine(MARGIN, 42f, PAGE_W - MARGIN, 42f, stroke(INK, 0.6f))
             y = 62f
         }
     }
@@ -170,17 +198,17 @@ private class ReportRenderer(
     }
 
     private fun drawFooter() {
-        canvas.drawLine(MARGIN, PAGE_H - 44f, PAGE_W - MARGIN, PAGE_H - 44f, stroke(BORDER, 0.8f))
-        canvas.drawText("MindTrack  ·  Self-reported wellbeing summary, not a clinical assessment", MARGIN, PAGE_H - 28f, tp(MUTED, 8f))
-        val right = tp(MUTED, 8f).apply { textAlign = Paint.Align.RIGHT }
+        canvas.drawLine(MARGIN, PAGE_H - 44f, PAGE_W - MARGIN, PAGE_H - 44f, stroke(INK, 0.6f))
+        canvas.drawText("MindTrack  ·  Self-reported wellbeing summary, not a clinical assessment", MARGIN, PAGE_H - 28f, tp(MUTED, 8.5f, Typeface.ITALIC))
+        val right = mono(MUTED, 8.5f).apply { textAlign = Paint.Align.RIGHT }
         val of = if (totalPages > 0) " of $totalPages" else ""
         canvas.drawText("Page $pageNo$of", PAGE_W - MARGIN, PAGE_H - 28f, right)
     }
 
     /** The app name, tiled diagonally across the whole page. */
     private fun drawWatermark() {
-        val paint = tp(ACCENT, 34f, Typeface.BOLD).apply {
-            alpha = 19
+        val paint = tp(Color.parseColor("#7A7A7A"), 32f, Typeface.BOLD_ITALIC).apply {
+            alpha = 22
             textAlign = Paint.Align.CENTER
         }
         canvas.save()
@@ -215,12 +243,14 @@ private class ReportRenderer(
         y += l.height + after
     }
 
+    private var section = 0
+
     private fun heading(title: String) {
         ensure(96f)
-        y += 10f
-        canvas.drawRoundRect(RectF(MARGIN, y, MARGIN + 4f, y + 17f), 2f, 2f, fill(ACCENT))
-        canvas.drawText(title, MARGIN + 12f, y + 13.5f, h1)
-        y += 28f
+        y += 12f
+        canvas.drawText("${++section}.  $title", MARGIN, y + 13.5f, h1)
+        canvas.drawLine(MARGIN, y + 20f, PAGE_W - MARGIN, y + 20f, stroke(ACCENT, 0.9f))
+        y += 32f
     }
 
     /** "What this shows / How to read it / In your data" block used under every graphic. */
@@ -243,8 +273,8 @@ private class ReportRenderer(
     private fun box(height: Float, fillColor: Int, borderColor: Int, drawInside: (RectF) -> Unit) {
         ensure(height)
         val r = RectF(MARGIN, y, PAGE_W - MARGIN, y + height)
-        canvas.drawRoundRect(r, 10f, 10f, fill(fillColor))
-        canvas.drawRoundRect(r, 10f, 10f, stroke(borderColor, 1f))
+        canvas.drawRect(r, fill(fillColor))
+        canvas.drawRect(r, stroke(borderColor, 0.9f))
         drawInside(r)
         y += height + 12f
     }
@@ -252,26 +282,27 @@ private class ReportRenderer(
     // ---- sections ---------------------------------------------------------------------
 
     private fun drawCover() {
-        val r = RectF(MARGIN, y, PAGE_W - MARGIN, y + 118f)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(r.left, r.top, r.right, r.bottom, Color.parseColor("#4B3FB0"), Color.parseColor("#8D7BEA"), Shader.TileMode.CLAMP)
-        }
-        canvas.drawRoundRect(r, 16f, 16f, paint)
+        // A plain letterhead: name, rule, title, who and when.
+        drawPixelMoon(canvas, MARGIN, y - 2f, 26f)
+        canvas.drawText("MINDTRACK", MARGIN + 34f, y + 13f, mono(ACCENT, 13f, Typeface.BOLD))
+        val tag = mono(MUTED, 9f).apply { textAlign = Paint.Align.RIGHT }
+        canvas.drawText("A PERSONAL WELLBEING RECORD", PAGE_W - MARGIN, y + 13f, tag)
+        y += 30f
+        canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(ACCENT, 1.6f))
+        canvas.drawLine(MARGIN, y + 3.5f, PAGE_W - MARGIN, y + 3.5f, stroke(ACCENT, 0.5f))
+        y += 40f
 
-        // Crescent mark, the same shape as the app logo.
-        val moon = Path().apply {
-            val outer = Path().apply { addCircle(r.left + 38f, r.top + 38f, 15f, Path.Direction.CW) }
-            val cut = Path().apply { addCircle(r.left + 45f, r.top + 33f, 13f, Path.Direction.CW) }
-            op(outer, cut, Path.Op.DIFFERENCE)
-        }
-        canvas.drawPath(moon, fill(Color.WHITE))
-        canvas.drawText("MindTrack", r.left + 62f, r.top + 43f, tp(Color.WHITE, 13f, Typeface.BOLD))
-
-        canvas.drawText("Wellbeing Report", r.left + 22f, r.top + 78f, tp(Color.WHITE, 27f, Typeface.BOLD))
-        val period = "${stats.from.format(DATE_FMT)}  –  ${stats.to.format(DATE_FMT)}"
-        canvas.drawText("Prepared for $name  ·  $period", r.left + 22f, r.top + 98f, tp(Color.parseColor("#E9E4FF"), 10.5f))
-        canvas.drawText("Generated ${LocalDate.now().format(DATE_FMT)}", r.left + 22f, r.top + 112f, tp(Color.parseColor("#CFC7F7"), 9f))
-        y += 118f + 18f
+        canvas.drawText("Wellbeing Report", MARGIN, y, tp(INK, 30f, Typeface.BOLD))
+        y += 24f
+        val period = "${stats.from.format(DATE_FMT)} to ${stats.to.format(DATE_FMT)}"
+        canvas.drawText("Prepared for $name", MARGIN, y, tp(INK, 12.5f))
+        y += 17f
+        canvas.drawText("Period covered: $period", MARGIN, y, tp(MUTED, 11f))
+        y += 15f
+        canvas.drawText("Generated on ${LocalDate.now().format(DATE_FMT)}", MARGIN, y, tp(MUTED, 11f, Typeface.ITALIC))
+        y += 16f
+        canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(BORDER, 0.8f))
+        y += 14f
     }
 
     private fun aboutAndDisclaimer() {
@@ -287,9 +318,9 @@ private class ReportRenderer(
             "and it does not replace professional care. Please share it with a qualified doctor or mental health professional, " +
             "who can interpret it alongside your history and an examination, and have its contents cross-verified by them. " +
             "If you feel unsafe or may be in danger, contact your local emergency number (112 in India, 911 in the US, 999 in the UK) straight away."
-        val l = layout(text, tp(INK, 10f), CONTENT_W - 28f)
-        box(l.height + 46f, Color.parseColor("#FFF6E0"), Color.parseColor("#E6B84F")) { r ->
-            canvas.drawText("Important  ·  please read", r.left + 14f, r.top + 20f, tp(Color.parseColor("#8A5A00"), 10.5f, Typeface.BOLD))
+        val l = layout(text, tp(INK, 10.5f), CONTENT_W - 28f)
+        box(l.height + 46f, ACCENT_SOFT, INK) { r ->
+            canvas.drawText("Important notice", r.left + 14f, r.top + 20f, tp(INK, 11f, Typeface.BOLD))
             canvas.save(); canvas.translate(r.left + 14f, r.top + 30f); l.draw(canvas); canvas.restore()
         }
     }
@@ -300,29 +331,26 @@ private class ReportRenderer(
             "These six figures describe the whole period. Averages use only the days on which a check-in was saved, so missed days do not pull them up or down.",
             after = 10f
         )
-        val tiles = listOf(
-            Triple("Check-ins", "${stats.records.size}", "days with a saved entry"),
+        val rows = listOf(
+            Triple("Check-ins saved", "${stats.records.size}", "days with a saved entry"),
             Triple("Period covered", "${stats.daysCovered} days", "first entry to last entry"),
             Triple("Consistency", "${stats.consistencyPercent}%", "of days in the period checked in"),
             Triple("Average mood", "${one(stats.averageMood)} / 5", "5 = Great, 1 = Rough"),
-            Triple("Average stress", "${one(stats.averageStress)} / 5", "higher = more stress"),
-            Triple("Average energy", "${one(stats.averageEnergy)} / 5", "higher = more energy")
+            Triple("Average stress", "${one(stats.averageStress)} / 5", "higher means more stress"),
+            Triple("Average energy", "${one(stats.averageEnergy)} / 5", "higher means more energy")
         )
-        val gap = 10f
-        val tileW = (CONTENT_W - 2 * gap) / 3f
-        ensure(2 * 70f + gap)
-        tiles.chunked(3).forEach { row ->
-            row.forEachIndexed { i, (title, value, caption) ->
-                val x = MARGIN + i * (tileW + gap)
-                val r = RectF(x, y, x + tileW, y + 66f)
-                canvas.drawRoundRect(r, 10f, 10f, fill(ACCENT_SOFT))
-                canvas.drawRoundRect(r, 10f, 10f, stroke(BORDER, 1f))
-                canvas.drawText(title.uppercase(), x + 10f, y + 16f, tp(MUTED, 7.5f, Typeface.BOLD))
-                canvas.drawText(value, x + 10f, y + 38f, tp(ACCENT, 18f, Typeface.BOLD))
-                canvas.drawText(caption, x + 10f, y + 55f, tp(MUTED, 8f))
-            }
-            y += 66f + gap
+        val rowH = 24f
+        ensure(rows.size * rowH + 10f)
+        canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(INK, 1.1f))
+        rows.forEach { (title, value, caption) ->
+            canvas.drawText(title, MARGIN + 6f, y + 16f, tp(INK, 10.5f, Typeface.BOLD))
+            canvas.drawText(value, MARGIN + 170f, y + 16f, tp(ACCENT, 12f, Typeface.BOLD))
+            canvas.drawText(caption, MARGIN + 270f, y + 16f, tp(MUTED, 9.5f, Typeface.ITALIC))
+            y += rowH
+            canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(GRID, 0.8f))
         }
+        canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(INK, 1.1f))
+        y += 12f
         paragraph(
             "Longest unbroken run of daily check-ins: ${stats.longestStreak} day${if (stats.longestStreak == 1) "" else "s"}.",
             small, after = 4f
@@ -359,8 +387,8 @@ private class ReportRenderer(
             else left + (d.toEpochDay() - stats.from.toEpochDay()).toFloat() / spanDays * (right - left)
 
         val frame = RectF(MARGIN, y, PAGE_W - MARGIN, y + height)
-        canvas.drawRoundRect(frame, 10f, 10f, fill(Color.WHITE, 140))
-        canvas.drawRoundRect(frame, 10f, 10f, stroke(BORDER, 1f))
+        canvas.drawRect(frame, fill(Color.WHITE, 200))
+        canvas.drawRect(frame, stroke(BORDER, 0.9f))
 
         val axis = tp(MUTED, 7.5f).apply { textAlign = Paint.Align.RIGHT }
         (1..5).forEach { v ->
@@ -373,7 +401,7 @@ private class ReportRenderer(
             val sorted = s.values.sortedBy { it.first }
             val path = Path()
             sorted.forEachIndexed { i, (d, v) -> if (i == 0) path.moveTo(xFor(d), yFor(v)) else path.lineTo(xFor(d), yFor(v)) }
-            if (sorted.size > 1) canvas.drawPath(path, stroke(s.color, 1.8f))
+            if (sorted.size > 1) canvas.drawPath(path, stroke(s.color, 1.4f))
             sorted.forEach { (d, v) ->
                 val c = if (colourByValue) MOOD_COLORS.getValue(v) else s.color
                 canvas.drawCircle(xFor(d), yFor(v), pointR, fill(c))
@@ -406,6 +434,7 @@ private class ReportRenderer(
     }
 
     private fun stressEnergySection() {
+        ensure(240f)   // heading, key and chart stay together
         heading("Stress and energy over time")
         ensure(18f)
         listOf("Stress" to STRESS_COLOR, "Energy" to ENERGY_COLOR).forEachIndexed { i, (n, c) ->
@@ -439,11 +468,11 @@ private class ReportRenderer(
         (5 downTo 1).forEach { score ->
             val count = stats.moodCounts.getValue(score)
             canvas.drawText("${moodLabel(score)} ($score)", MARGIN, y + 11f, tp(INK, 9.5f))
-            canvas.drawRoundRect(RectF(MARGIN + labelW, y + 1f, MARGIN + labelW + maxBar, y + 15f), 4f, 4f, fill(GRID))
+            canvas.drawRoundRect(RectF(MARGIN + labelW, y + 1f, MARGIN + labelW + maxBar, y + 15f), 1.5f, 1.5f, fill(GRID))
             if (count > 0) {
                 canvas.drawRoundRect(
                     RectF(MARGIN + labelW, y + 1f, MARGIN + labelW + maxBar * count / maxCount, y + 15f),
-                    4f, 4f, fill(MOOD_COLORS.getValue(score))
+                    1.5f, 1.5f, fill(MOOD_COLORS.getValue(score))
                 )
             }
             canvas.drawText("$count  (${(count * 100.0 / n).toInt()}%)", MARGIN + labelW + maxBar + 8f, y + 11f, tp(MUTED, 9f))
@@ -468,10 +497,10 @@ private class ReportRenderer(
         DayOfWeek.entries.forEachIndexed { i, day ->
             val x = MARGIN + i * colW
             val avg = stats.weekdayMood[day]
-            canvas.drawRoundRect(RectF(x + 10f, baseY - maxH, x + colW - 10f, baseY), 4f, 4f, fill(GRID, 160))
+            canvas.drawRoundRect(RectF(x + 10f, baseY - maxH, x + colW - 10f, baseY), 1.5f, 1.5f, fill(GRID, 160))
             if (avg != null) {
                 val h = maxH * (avg / 5.0).toFloat()
-                canvas.drawRoundRect(RectF(x + 10f, baseY - h, x + colW - 10f, baseY), 4f, 4f, fill(ACCENT))
+                canvas.drawRoundRect(RectF(x + 10f, baseY - h, x + colW - 10f, baseY), 1.5f, 1.5f, fill(ACCENT))
                 val c = tp(INK, 8.5f, Typeface.BOLD).apply { textAlign = Paint.Align.CENTER }
                 canvas.drawText(one(avg), x + colW / 2f, baseY - h - 4f, c)
             } else {
@@ -512,9 +541,10 @@ private class ReportRenderer(
         val cols = floatArrayOf(MARGIN + 8f, MARGIN + 150f, MARGIN + 290f, MARGIN + 380f)
         fun header() {
             ensure(34f)
-            canvas.drawRoundRect(RectF(MARGIN, y, PAGE_W - MARGIN, y + 20f), 6f, 6f, fill(ACCENT))
-            val w = tp(Color.WHITE, 8.5f, Typeface.BOLD)
-            listOf("DATE", "MOOD", "STRESS (1-5)", "ENERGY (1-5)").forEachIndexed { i, t -> canvas.drawText(t, cols[i], y + 13.5f, w) }
+            canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(INK, 1.1f))
+            val w = mono(INK, 8.5f, Typeface.BOLD)
+            listOf("DATE", "MOOD", "STRESS (1-5)", "ENERGY (1-5)").forEachIndexed { i, t -> canvas.drawText(t, cols[i], y + 14f, w) }
+            canvas.drawLine(MARGIN, y + 20f, PAGE_W - MARGIN, y + 20f, stroke(INK, 0.6f))
             y += 24f
         }
         header()
@@ -529,7 +559,7 @@ private class ReportRenderer(
             val note = if (extra.isNotEmpty()) layout(extra, tp(MUTED, 9f, Typeface.ITALIC), CONTENT_W - 24f) else null
             val rowH = 20f + (note?.height?.toFloat()?.plus(6f) ?: 0f)
             if (y + rowH > BOTTOM_LIMIT) { endPage(); startPage(); header() }
-            if (index % 2 == 0) canvas.drawRoundRect(RectF(MARGIN, y - 2f, PAGE_W - MARGIN, y + rowH - 2f), 4f, 4f, fill(ACCENT_SOFT, 200))
+            if (index % 2 == 0) canvas.drawRect(RectF(MARGIN, y - 2f, PAGE_W - MARGIN, y + rowH - 2f), fill(ACCENT_SOFT, 220))
             val d = LocalDate.parse(r.date)
             canvas.drawText("${d.format(DATE_FMT)}", cols[0], y + 11f, tp(INK, 9.5f))
             canvas.drawCircle(cols[1] + 5f, y + 8f, 4.5f, fill(MOOD_COLORS.getValue(r.mood)))
@@ -541,7 +571,8 @@ private class ReportRenderer(
             }
             y += rowH
         }
-        y += 8f
+        canvas.drawLine(MARGIN, y, PAGE_W - MARGIN, y, stroke(INK, 1.1f))
+        y += 10f
     }
 
     private fun doctorSection() {
@@ -565,7 +596,7 @@ private class ReportRenderer(
             "diagnosis or treatment plan, and it is not a replacement for professional medical care. Please get it reviewed and " +
             "cross-verified by a qualified doctor before relying on anything in it."
         val l = layout(closing, tp(INK, 9.5f), CONTENT_W - 28f)
-        box(l.height + 30f, Color.parseColor("#FFF6E0"), Color.parseColor("#E6B84F")) { r ->
+        box(l.height + 30f, ACCENT_SOFT, INK) { r ->
             canvas.save(); canvas.translate(r.left + 14f, r.top + 15f); l.draw(canvas); canvas.restore()
         }
     }

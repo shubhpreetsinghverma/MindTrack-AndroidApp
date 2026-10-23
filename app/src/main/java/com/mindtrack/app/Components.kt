@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.draw.drawBehind
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -116,9 +117,7 @@ internal fun ScreenHeader(
         Text(
             eyebrow,
             color = Lavender,
-            fontSize = 10.sp,
-            letterSpacing = 1.8.sp,
-            fontWeight = FontWeight.SemiBold
+            style = PixelLabelStyle
         )
 
         Spacer(Modifier.height(8.dp))
@@ -174,9 +173,8 @@ internal fun MetricCard(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(SurfaceColor)
-            .padding(17.dp)
+            .quietCard(16.dp)
+            .padding(15.dp)
     ) {
         Text(
             title,
@@ -190,7 +188,7 @@ internal fun MetricCard(
             value,
             color = Lavender,
             fontSize = 26.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Medium
         )
 
         Spacer(Modifier.height(5.dp))
@@ -263,44 +261,21 @@ internal fun InsightCard(
 
     fun requestSuggestions() = suggestions.load(records, summary)
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(SurfaceElevated)
-            .padding(18.dp)
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(Lavender.copy(alpha = 0.13f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("✧", color = Lavender, fontSize = 24.sp)
-            }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            (if (records.isEmpty()) tr("Your summary will appear here") else tr("What your check-ins are showing")).uppercase(),
+            color = Lavender,
+            style = PixelLabelStyle
+        )
 
-            Spacer(Modifier.width(13.dp))
+        Spacer(Modifier.height(8.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (records.isEmpty()) tr("Your summary will appear here") else tr("What your check-ins are showing"),
-                    color = TextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(Modifier.height(7.dp))
-
-                Text(
-                    summary,
-                    color = TextSecondary,
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp
-                )
-            }
-        }
+        Text(
+            summary,
+            color = TextPrimary,
+            fontSize = 15.sp,
+            lineHeight = 23.sp
+        )
 
         Spacer(Modifier.height(14.dp))
 
@@ -329,16 +304,14 @@ internal fun InsightCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Background.copy(alpha = 0.55f))
-                    .padding(13.dp),
+                    .quietCard(12.dp)
+                    .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    tr("Small next steps, based on this summary"),
-                    color = TextPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
+                    tr("Small next steps, based on this summary").uppercase(),
+                    color = TextSecondary,
+                    style = PixelLabelStyle.copy(fontSize = 10.sp)
                 )
 
                 if (isLoadingSuggestions && parsedSuggestions.isEmpty()) {
@@ -383,13 +356,7 @@ internal fun RatingSlider(
     highLabel: String,
     onValueChange: (Int) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(SurfaceColor)
-            .padding(18.dp)
-    ) {
+    HomeSection {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -418,18 +385,12 @@ internal fun RatingSlider(
             fontSize = 12.sp
         )
 
-        Slider(
-            modifier = Modifier.semantics {
-                contentDescription = title
-                stateDescription = trf("%1\$d out of 5", value)
-            },
-            value = value.toFloat(),
-            onValueChange = {
-                onValueChange(it.roundToInt().coerceIn(1, 5))
-            },
-            valueRange = 1f..5f,
-            steps = 3
-        )
+        Spacer(Modifier.height(12.dp))
+
+        Spacer(Modifier.height(12.dp))
+        BlockMeter(title, value, onValueChange)
+
+        Spacer(Modifier.height(10.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -487,6 +448,45 @@ internal fun InfoCard(
 // BOTTOM NAVIGATION
 // ------------------------------------------------------------
 
+/** Pixel icons for the five tabs, 9 columns wide. A "#" is a filled square. */
+private val tabPixels: Map<AppTab, List<String>> = mapOf(
+    AppTab.HOME to listOf(
+        "....#....", "...###...", "..#####..", ".#######.",
+        "..#...#..", "..#...#..", "..#.#.#..", "..#.#.#..", "..#####.."
+    ),
+    AppTab.INSIGHTS to listOf(
+        ".........", ".........", "....##...", "....##...",
+        "....##.##", "##..##.##", "##..##.##", "##..##.##", "#########"
+    ),
+    AppTab.COMPANION to listOf(
+        ".........", "..##.##..", ".#######.", "#########",
+        "#########", ".#######.", "..#####..", "...###...", "....#...."
+    ),
+    AppTab.PROFILE to listOf(
+        "...###...", "..#####..", "..#####..", "...###...",
+        ".........", ".#######.", "#########", "#########", "#########"
+    )
+)
+
+@Composable
+private fun TabIcon(tab: AppTab, tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val unit = kotlin.math.floor(size.width / 9f).coerceAtLeast(1f)
+        val origin = (size.width - unit * 9f) / 2f
+        if (tab == AppTab.MOOD) {
+            // The mood tab uses the same little crescent as the rest of the app.
+            val cell = size.width / 12f
+            moonCells.forEach { (x, y) -> drawRect(tint, Offset(x * cell, y * cell), androidx.compose.ui.geometry.Size(cell + 0.5f, cell + 0.5f)) }
+        } else {
+            tabPixels.getValue(tab).forEachIndexed { y, row ->
+                row.forEachIndexed { x, ch ->
+                    if (ch == '#') drawRect(tint, Offset(origin + x * unit, origin + y * unit), androidx.compose.ui.geometry.Size(unit, unit))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 internal fun BottomNavigationBar(
     selectedTab: AppTab,
@@ -494,72 +494,52 @@ internal fun BottomNavigationBar(
 ) {
     Surface(
         color = ThemeState.palette.navSurface,
-        shadowElevation = 10.dp
+        modifier = Modifier.drawBehind {
+            // A hairline instead of a shadow keeps the bar flat and quiet.
+            drawLine(Border, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
+        }
     ) {
         Row(
             modifier = Modifier
                 .navigationBarsPadding()
                 .fillMaxWidth()
-                .padding(horizontal = 5.dp, vertical = 8.dp),
+                .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             AppTab.entries.forEach { tab ->
                 val selected = selectedTab == tab
                 val press = remember { MutableInteractionSource() }
-                val pill by animateColorAsState(
-                    if (selected) Lavender.copy(alpha = 0.14f) else Color.Transparent,
-                    tween(220), label = "navPill"
-                )
                 val tint by animateColorAsState(
-                    if (selected) Lavender else TextSecondary,
-                    tween(220), label = "navTint"
+                    if (selected) Lavender else TextSecondary.copy(alpha = 0.75f),
+                    tween(180), label = "navTint"
                 )
-
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .pressScale(press, 0.94f)
-                        .clip(RoundedCornerShape(15.dp))
                         .selectable(
                             selected = selected,
                             interactionSource = press,
                             indication = null,
                             role = Role.Tab
-                        ) { onTabSelected(tab) }
-                        .padding(vertical = 7.dp),
+                        ) { onTabSelected(tab) },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // A short bar above the active tab, like a cursor on a handheld screen.
                     Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(pill)
-                            .padding(
-                                horizontal = 14.dp,
-                                vertical = 5.dp
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            tab.icon,
-                            color = tint,
-                            fontSize = 22.sp,
-                            modifier = Modifier.clearAndSetSemantics {}
-                        )
-                    }
-
-                    Spacer(Modifier.height(3.dp))
-
+                        Modifier.padding(bottom = 8.dp).size(width = 22.dp, height = 3.dp)
+                            .background(if (selected) Lavender else Color.Transparent)
+                    )
+                    Box(Modifier.clearAndSetSemantics {}) { TabIcon(tab, tint) }
+                    Spacer(Modifier.height(5.dp))
                     Text(
                         tr(tab.label),
                         color = tint,
-                        fontSize = 10.sp,
-                        fontWeight = if (selected) {
-                            FontWeight.SemiBold
-                        } else {
-                            FontWeight.Normal
-                        },
-                        textAlign = TextAlign.Center
+                        style = PixelLabelStyle.copy(fontSize = 10.sp, letterSpacing = 0.4.sp),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 9.dp)
                     )
                 }
             }
@@ -590,10 +570,10 @@ internal fun TagChips(selected: List<String>, onToggle: (String) -> Unit, modifi
             val on = tag in selected
             Box(
                 Modifier
-                    .heightIn(min = 40.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (on) Lavender.copy(alpha = 0.18f) else SurfaceElevated)
-                    .border(1.dp, if (on) Lavender else Border, RoundedCornerShape(20.dp))
+                    .heightIn(min = 38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (on) Lavender.copy(alpha = 0.16f) else Color.Transparent)
+                    .border(1.dp, if (on) Lavender else Border, RoundedCornerShape(10.dp))
                     .toggleable(value = on, role = Role.Checkbox, onValueChange = { onToggle(tag) })
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
@@ -603,3 +583,67 @@ internal fun TagChips(selected: List<String>, onToggle: (String) -> Unit, modifi
         }
     }
 }
+
+
+/** A quiet card: just a hairline outline on the page colour, no fill. */
+internal fun Modifier.quietCard(radius: androidx.compose.ui.unit.Dp = 18.dp): Modifier {
+    val shape = RoundedCornerShape(radius)
+    return this.clip(shape).border(1.dp, Border, shape)
+}
+
+
+/** A flat section: a hairline above it and some air, with no box. Same look as the sections on Home. */
+internal fun Modifier.flatSection(): Modifier = this
+    .drawBehind { drawLine(Border, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx()) }
+    .padding(top = 18.dp)
+
+/** Five blocks instead of a slider: tap the number that fits, and everything up to it fills in. */
+@Composable
+internal fun BlockMeter(title: String, value: Int, onValueChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        (1..5).forEach { step ->
+            val on = step <= value
+            val shape = RoundedCornerShape(8.dp)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(shape)
+                    .background(if (on) Lavender else Color.Transparent)
+                    .border(1.dp, if (on) Lavender else Border, shape)
+                    .selectable(selected = step == value, role = Role.RadioButton) { onValueChange(step) }
+                    .semantics {
+                        contentDescription = "$title $step"
+                        stateDescription = trf("%1\$d out of 5", step)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "$step",
+                    color = if (on) Background else TextSecondary,
+                    style = PixelLabelStyle.copy(letterSpacing = 0.sp),
+                    modifier = Modifier.clearAndSetSemantics {}
+                )
+            }
+        }
+    }
+}
+
+
+/** Text-field colours for the flat theme: a thin outline that turns lavender when you type. */
+@Composable
+internal fun quietFieldColors() = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Lavender,
+    unfocusedBorderColor = Border,
+    disabledBorderColor = Border,
+    cursorColor = Lavender,
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    focusedLabelColor = Lavender,
+    unfocusedLabelColor = TextSecondary,
+    focusedPlaceholderColor = TextSecondary,
+    unfocusedPlaceholderColor = TextSecondary
+)

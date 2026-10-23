@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="mindtrack_night">#090D1B</color>
+    <color name="mindtrack_night">#12121C</color>
 
     <style name="Theme.MindTrack" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/mindtrack_night</item>

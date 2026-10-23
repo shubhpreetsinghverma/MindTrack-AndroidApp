@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -27,40 +28,40 @@ internal class Palette(
     val guideInk: Color
 )
 
-/** The original premium navy and lavender. */
+/** "Night pixel": deep ink with soft lavender, like a night-light. */
 internal val DarkPalette = Palette(
-    background = Color(0xFF090D1B),
-    surface = Color(0xFF12192B),
-    surfaceElevated = Color(0xFF1A2340),
-    surfaceSelected = Color(0xFF272746),
+    background = Color(0xFF12121C),
+    surface = Color(0xFF1A1A28),
+    surfaceElevated = Color(0xFF222234),
+    surfaceSelected = Color(0xFF2C2C42),
     lavender = Color(0xFFB8A5FF),
     lavenderBright = Color(0xFF9B82FF),
-    textPrimary = Color(0xFFF5F3FF),
-    textSecondary = Color(0xFFA4AEC7),
+    textPrimary = Color(0xFFEAE7F5),
+    textSecondary = Color(0xFF9A97B4),
     mint = Color(0xFF91E0C3),
-    border = Color(0xFF29324A),
+    border = Color(0xFF2A2A40),
     coral = Color(0xFFFFA7A7),
-    navSurface = Color(0xFF0E1425),
-    guideGradient = listOf(Color(0xFF292447), Color(0xFF1C2440), Color(0xFF25213D)),
+    navSurface = Color(0xFF12121C),
+    guideGradient = listOf(Color(0xFF222234), Color(0xFF222234), Color(0xFF222234)),
     guideInk = Color(0xFFD0C1FF)
 )
 
-/** White with a lavender tint. Accent colours are darker than in the dark theme so text stays readable. */
+/** "Quiet pixel": warm off-white with dusty lavender. Accent text is dark enough to read on the paper colour. */
 internal val LightPalette = Palette(
-    background = Color(0xFFFBFAFF),
-    surface = Color(0xFFF2EFFF),
-    surfaceElevated = Color(0xFFE7E2FF),
-    surfaceSelected = Color(0xFFDCD4FF),
-    lavender = Color(0xFF6A55D4),
-    lavenderBright = Color(0xFF7A62F0),
-    textPrimary = Color(0xFF1D1A3A),
-    textSecondary = Color(0xFF5C6285),
-    mint = Color(0xFF17876A),
-    border = Color(0xFFDAD4F4),
-    coral = Color(0xFFD1435B),
-    navSurface = Color(0xFFF4F1FF),
-    guideGradient = listOf(Color(0xFFE4DEFF), Color(0xFFEDE9FF), Color(0xFFE0D9FF)),
-    guideInk = Color(0xFF5B46C4)
+    background = Color(0xFFF8F6F1),
+    surface = Color(0xFFF0EDE5),
+    surfaceElevated = Color(0xFFE9E5DB),
+    surfaceSelected = Color(0xFFDFDACD),
+    lavender = Color(0xFF6B5FB3),
+    lavenderBright = Color(0xFF7D70C9),
+    textPrimary = Color(0xFF2A2733),
+    textSecondary = Color(0xFF6C6879),
+    mint = Color(0xFF2F8062),
+    border = Color(0xFFDCD8CC),
+    coral = Color(0xFFB94A4A),
+    navSurface = Color(0xFFF8F6F1),
+    guideGradient = listOf(Color(0xFFE9E5DB), Color(0xFFE9E5DB), Color(0xFFE9E5DB)),
+    guideInk = Color(0xFF6B5FB3)
 )
 
 /**
@@ -100,10 +101,17 @@ internal fun mindTrackColorScheme(): ColorScheme {
             background = p.background, onBackground = p.textPrimary,
             surface = p.surface, onSurface = p.textPrimary,
             surfaceVariant = p.surfaceElevated, onSurfaceVariant = p.textSecondary,
-            outline = Color(0xFF8E89B3), outlineVariant = p.border
+            outline = Color(0xFF8A8696), outlineVariant = p.border
         )
     }
 }
 
 internal fun readThemeMode(prefs: android.content.SharedPreferences): ThemeMode =
     runCatching { ThemeMode.valueOf(prefs.getString("theme_mode", null) ?: "SYSTEM") }.getOrDefault(ThemeMode.SYSTEM)
+
+
+/** Dialogs and sheets get small, squarer corners to match the flat look. */
+internal val mindTrackShapes = androidx.compose.material3.Shapes(
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+)

@@ -57,7 +57,7 @@ class MainActivity : FragmentActivity() {
         val firstLaunch = !settings.getBoolean("intro_seen", false)
 
         setContent {
-            MaterialTheme(colorScheme = mindTrackColorScheme()) {
+            MaterialTheme(colorScheme = mindTrackColorScheme(), shapes = mindTrackShapes) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = Background

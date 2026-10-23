@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.foundation.border
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -98,8 +99,8 @@ import kotlin.math.sin
 internal fun AboutMindTrackScreen(onBack: () -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Background),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 30.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
         item {
             TextButton(onClick = onBack) {
@@ -107,26 +108,21 @@ internal fun AboutMindTrackScreen(onBack: () -> Unit) {
             }
         }
         item {
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(SurfaceColor).padding(24.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                Text(tr("ABOUT THE APP"), color = Lavender, fontSize = 10.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(12.dp))
-                Text(tr("Meet MindTrack"), color = TextPrimary, fontSize = 29.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
+            Column(horizontalAlignment = Alignment.Start) {
+                PixelMoon(size = 58.dp, mood = MoonMood.SLEEPY, modifier = Modifier.clearAndSetSemantics {})
+                Spacer(Modifier.height(16.dp))
+                Text(tr("ABOUT THE APP"), color = Lavender, style = PixelLabelStyle)
+                Spacer(Modifier.height(8.dp))
+                Text(tr("Meet MindTrack"), color = TextPrimary, fontSize = 29.sp, lineHeight = 35.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(10.dp))
                 Text(
                     tr("MindTrack is a personal wellbeing companion designed to help you pause, check in with yourself, and notice patterns in how you feel over time."),
                     color = TextSecondary, fontSize = 15.sp, lineHeight = 23.sp
                 )
             }
         }
-        item {
-            AboutJourneyDiagram()
-        }
-        item {
-            AboutMoodScaleFigure()
-        }
+        item { AboutJourneyDiagram() }
+        item { AboutMoodScaleFigure() }
         item {
             AboutSection(
                 title = tr("A small moment for yourself"),
@@ -154,15 +150,14 @@ internal fun AboutMindTrackScreen(onBack: () -> Unit) {
     }
 }
 
+/** The three steps of the app, numbered in small pixel squares. */
 @Composable
 internal fun AboutJourneyDiagram() {
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)
-    ) {
-        Text(tr("How MindTrack works"), color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    HomeSection {
+        Text(tr("How MindTrack works"), color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(6.dp))
-        Text(tr("A simple loop — no scores to chase, no pressure to be a certain way."), color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-        Spacer(Modifier.height(16.dp))
+        Text(tr("A simple loop — no scores to chase, no pressure to be a certain way."), color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+        Spacer(Modifier.height(18.dp))
         listOf(
             Triple("01", tr("Check in"), tr("Name your mood and rate stress and energy.")),
             Triple("02", tr("Reflect"), tr("Add a note if you want; skipping is always okay.")),
@@ -170,74 +165,54 @@ internal fun AboutJourneyDiagram() {
         ).forEachIndexed { index, step ->
             Row(verticalAlignment = Alignment.Top) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(34.dp).clip(CircleShape).background(SurfaceSelected), contentAlignment = Alignment.Center) {
-                        Text(step.first, color = Lavender, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        Modifier.size(34.dp).border(1.dp, Lavender, RoundedCornerShape(6.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(step.first, color = Lavender, style = PixelLabelStyle.copy(letterSpacing = 0.sp))
                     }
-                    if (index < 2) Box(Modifier.padding(vertical = 3.dp).width(2.dp).height(24.dp).background(Lavender.copy(alpha = 0.35f)))
+                    if (index < 2) {
+                        // A short dotted line, in whole pixels, to the next step.
+                        Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            repeat(3) { Box(Modifier.size(3.dp).background(Border)) }
+                        }
+                    }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.padding(top = 2.dp)) {
-                    Text(step.second, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.padding(top = 5.dp)) {
+                    Text(step.second, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(3.dp))
-                    Text(step.third, color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                    Text(step.third, color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
                 }
             }
-            if (index < 2) Spacer(Modifier.height(8.dp))
+            if (index < 2) Spacer(Modifier.height(10.dp))
         }
     }
 }
 
+/** The five pixel faces and the five mood colours, as one quiet strip. */
 @Composable
 internal fun AboutMoodScaleFigure() {
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)
-    ) {
-        Text(tr("Your mood is information, not a verdict"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+    HomeSection {
+        Text(tr("Your mood is information, not a verdict"), color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(6.dp))
-        Text(tr("A mood check-in captures one moment. It does not define you, predict your future, or diagnose a condition."), color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-        Spacer(Modifier.height(16.dp))
+        Text(tr("A mood check-in captures one moment. It does not define you, predict your future, or diagnose a condition."), color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+        Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             moodOptions.reversed().forEach { option ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    MoodFace(score = option.score, selected = false, modifier = Modifier.size(31.dp))
+                    MoodFace(score = option.score, selected = false, modifier = Modifier.size(33.dp))
                     Spacer(Modifier.height(6.dp))
-                    Text(tr(option.label), color = TextSecondary, fontSize = 9.sp, textAlign = TextAlign.Center)
+                    Text(tr(option.label), color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.Center)
                 }
             }
         }
         Spacer(Modifier.height(12.dp))
-        Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
-            drawRoundRect(
-                brush = Brush.horizontalGradient(listOf(Color(0xFF8B9CCB), Lavender, Color(0xFFB9A6D8))),
-                size = androidx.compose.ui.geometry.Size(size.width, size.height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
-            )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            (1..5).forEach { score -> Box(Modifier.weight(1f).height(6.dp).background(moodColorFor(score))) }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(tr("All feelings are welcome here."), color = Lavender, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-internal fun HomeQuickTools(
-    onCheckInClick: () -> Unit,
-    onInsightsClick: () -> Unit,
-    onResourceClick: () -> Unit,
-    onHistoryClick: () -> Unit = {},
-    onExercisesClick: () -> Unit = {}
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(tr("A little support, when you need it"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-        Text(tr("Choose a small next step."), color = TextSecondary, fontSize = 12.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickToolCard(tr("Take a pause"), tr("Check in with yourself"), "◷", Modifier.weight(1f), onCheckInClick)
-            QuickToolCard(tr("Explore patterns"), tr("See your mood journey"), "↗", Modifier.weight(1f), onInsightsClick)
-        }
-        QuickToolCard(tr("Breathe and ground"), tr("Short calming exercises"), "◌", Modifier.fillMaxWidth(), onExercisesClick)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickToolCard(tr("Your history"), tr("Browse and edit past check-ins"), "☰", Modifier.weight(1f), onHistoryClick)
-            QuickToolCard(tr("Trusted resources"), tr("Guidance and helplines"), "＋", Modifier.weight(1f), onResourceClick)
-        }
+        Spacer(Modifier.height(10.dp))
+        Text(tr("All feelings are welcome here."), color = Lavender, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -262,8 +237,8 @@ internal fun QuickToolCard(title: String, subtitle: String, symbol: String, modi
 
 @Composable
 internal fun ProfileStatCard(value: String, label: String, modifier: Modifier = Modifier) {
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(SurfaceElevated).padding(14.dp)) {
-        Text(value, color = Lavender, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    Column(modifier.quietCard(14.dp).padding(12.dp)) {
+        Text(value, color = Lavender, fontSize = 22.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(4.dp))
         Text(label, color = TextSecondary, fontSize = 11.sp, lineHeight = 15.sp)
     }
@@ -271,10 +246,8 @@ internal fun ProfileStatCard(value: String, label: String, modifier: Modifier = 
 
 @Composable
 internal fun AboutSection(title: String, body: String) {
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceColor).padding(20.dp)
-    ) {
-        Text(title, color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+    HomeSection {
+        Text(title, color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(8.dp))
         Text(body, color = TextSecondary, fontSize = 14.sp, lineHeight = 22.sp)
     }

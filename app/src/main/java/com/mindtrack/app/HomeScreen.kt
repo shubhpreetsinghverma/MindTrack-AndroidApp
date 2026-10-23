@@ -95,7 +95,9 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // ------------------------------------------------------------
-// HOME DASHBOARD
+// HOME
+// Kept deliberately small: a greeting, today's check-in, and a kind line. Everything else lives behind
+// the Guide (what MindTrack is) and Resources (tools and support) buttons.
 // ------------------------------------------------------------
 
 @Composable
@@ -105,25 +107,35 @@ internal fun HomeScreen(
     checkedIn: Boolean,
     records: List<CheckInRecord>,
     streak: Int = 0,
+    allRecords: List<CheckInRecord> = records,
+    dismissedInsights: Set<String> = emptySet(),
+    onInsightsClick: () -> Unit = {},
+    name: String? = null,
     onHistoryClick: () -> Unit = {},
     onExercisesClick: () -> Unit = {},
     onCheckInClick: () -> Unit,
-    onInsightsClick: () -> Unit,
-    onResourceClick: () -> Unit,
-    onAboutClick: () -> Unit,
-    onMoodOptionClick: (MoodOption) -> Unit
+    onResourcesClick: () -> Unit,
+    onGuideClick: () -> Unit
 ) {
+    // A Low or Rough day in the last day or so gets a gentler tone instead of jokes.
+    val latest = records.maxByOrNull { it.date }
+    val softTone = latest != null && latest.mood <= 2 && latest.date >= today.minusDays(1).toString()
+    val hour = java.time.LocalTime.now().hour
+    val language = Lang.current
+    val greeting = remember(name, hour / 4, softTone, language) {
+        greetingFor(firstNameOf(name), hour, softTone, kotlin.random.Random(HomeSeed.greetingSeed))
+    }
+    val reminder = remember(language) { reminderFor(kotlin.random.Random(HomeSeed.reminderSeed)) }
+    val moonMood = when {
+        softTone -> MoonMood.GENTLE
+        checkedIn -> moonMoodFor(mood)
+        else -> MoonMood.SLEEPY
+    }
+
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Background),
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            top = 16.dp,
-            bottom = 24.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        modifier = Modifier.fillMaxSize().background(Background),
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
             Row(
@@ -131,344 +143,132 @@ internal fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
-                    Text(
-                        tr("MindTrack"),
-                        modifier = Modifier.clickable(onClick = onAboutClick),
-                        color = TextPrimary,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(Modifier.height(4.dp))
-
-                    Text(
-                        tr("YOUR SPACE TO RESET"),
-                        color = TextSecondary,
-                        fontSize = 10.sp,
-                        letterSpacing = 2.sp
-                    )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(17.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = ThemeState.palette.guideGradient
-                                )
-                            )
-                            .semantics { contentDescription = tr("Resource guide") }
-                            .clickable(role = Role.Button, onClick = onResourceClick),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // A crisp open-book mark makes this clearly a guide, not a generic sparkle.
-                        Canvas(modifier = Modifier.size(27.dp)) {
-                            val ink = ThemeState.palette.guideInk
-                            val strokeWidth = 1.8.dp.toPx()
-                            val leftPage = Path().apply {
-                                moveTo(size.width * 0.47f, size.height * 0.27f)
-                                cubicTo(size.width * 0.34f, size.height * 0.17f, size.width * 0.18f, size.height * 0.18f, size.width * 0.08f, size.height * 0.23f)
-                                lineTo(size.width * 0.08f, size.height * 0.76f)
-                                cubicTo(size.width * 0.23f, size.height * 0.69f, size.width * 0.37f, size.height * 0.73f, size.width * 0.47f, size.height * 0.84f)
-                                close()
-                            }
-                            val rightPage = Path().apply {
-                                moveTo(size.width * 0.53f, size.height * 0.27f)
-                                cubicTo(size.width * 0.66f, size.height * 0.17f, size.width * 0.82f, size.height * 0.18f, size.width * 0.92f, size.height * 0.23f)
-                                lineTo(size.width * 0.92f, size.height * 0.76f)
-                                cubicTo(size.width * 0.77f, size.height * 0.69f, size.width * 0.63f, size.height * 0.73f, size.width * 0.53f, size.height * 0.84f)
-                                close()
-                            }
-                            drawPath(leftPage, ink, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
-                            drawPath(rightPage, ink, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
-                            drawLine(ink, Offset(size.width * 0.5f, size.height * 0.28f), Offset(size.width * 0.5f, size.height * 0.83f), strokeWidth, cap = StrokeCap.Round)
-                            drawLine(ink.copy(alpha = 0.7f), Offset(size.width * 0.17f, size.height * 0.38f), Offset(size.width * 0.34f, size.height * 0.39f), strokeWidth * 0.65f, cap = StrokeCap.Round)
-                            drawLine(ink.copy(alpha = 0.7f), Offset(size.width * 0.66f, size.height * 0.39f), Offset(size.width * 0.83f, size.height * 0.38f), strokeWidth * 0.65f, cap = StrokeCap.Round)
-                        }
-                    }
-                    Text(
-                        text = tr("GUIDE"),
-                        color = Lavender,
-                        fontSize = 8.sp,
-                        letterSpacing = 1.4.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Text(
+                    today.format(DateTimeFormatter.ofPattern("EEE d MMM", appLocale())).uppercase(Locale.getDefault()),
+                    color = TextSecondary, style = PixelLabelStyle
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    HomeIconButton(label = tr("GUIDE"), description = tr("Meet MindTrack"), onClick = onGuideClick) { GuideIcon() }
+                    HomeIconButton(label = tr("RESOURCES"), description = tr("Resources"), onClick = onResourcesClick) { ResourcesIcon() }
                 }
             }
         }
 
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(SurfaceColor)
-                    .drawBehind {
-                        // A faint lavender glow in the corner: depth without decoration.
-                        val glowCentre = Offset(size.width * 0.92f, 0f)
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                listOf(Lavender.copy(alpha = 0.15f), Color.Transparent),
-                                center = glowCentre, radius = size.width * 0.7f
-                            ),
-                            radius = size.width * 0.7f, center = glowCentre
-                        )
-                    }
-                    .border(1.dp, Border.copy(alpha = 0.7f), RoundedCornerShape(28.dp))
-                    .padding(22.dp)
-            ) {
-                Text(
-                    today.format(
-                        DateTimeFormatter.ofPattern(
-                            "EEEE, d MMMM",
-                            appLocale()
-                        )
-                    ).uppercase(Locale.getDefault()),
-                    color = Lavender,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.6.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Text(
-                    if (checkedIn) {
-                        tr("You showed up for yourself today.")
-                    } else {
-                        tr("A little space\njust for you.")
-                    },
-                    color = TextPrimary,
-                    fontSize = 29.sp,
-                    lineHeight = 36.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.height(9.dp))
-
-                Text(
-                    if (checkedIn) {
-                        tr("Take a moment to notice how you're feeling now.")
-                    } else {
-                        tr("Take a breath. How are you, really?")
-                    },
-                    color = TextSecondary,
-                    fontSize = 14.sp,
-                    lineHeight = 21.sp
-                )
-
-                Spacer(Modifier.height(22.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            if (checkedIn) tr("TODAY'S MOOD") else tr("DAILY CHECK-IN"),
-                            color = TextSecondary,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.2.sp
-                        )
-
-                        Spacer(Modifier.height(6.dp))
-
-                        Text(
-                            if (checkedIn) {
-                                moodOptions.firstOrNull {
-                                    it.score == mood
-                                }?.label?.let { tr(it) }
-                                    ?: tr("Okay")
-                            } else {
-                                tr("A few minutes for yourself")
-                            },
-                            color = TextPrimary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    Button(
-                        onClick = onCheckInClick,
-                        shape = RoundedCornerShape(15.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Lavender,
-                            contentColor = Background
-                        ),
-                        contentPadding = PaddingValues(
-                            horizontal = 16.dp,
-                            vertical = 12.dp
-                        )
-                    ) {
-                        Text(
-                            if (checkedIn) tr("Update  →") else tr("Begin  →"),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+            Column {
+                PixelMoon(size = 52.dp, mood = moonMood, modifier = Modifier.clearAndSetSemantics {})
+                Spacer(Modifier.height(14.dp))
+                Text(greeting.title, color = TextPrimary, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(6.dp))
+                Text(greeting.line, color = TextSecondary, fontSize = 15.sp, lineHeight = 22.sp)
             }
-        }
-
-        item {
-            SectionHeading(
-                title = tr("How are you feeling?"),
-                subtitle = tr("Whatever you're feeling, it belongs here.")
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                moodOptions.forEach { option ->
-                    // Home cards are neutral by default. Only a mouse/trackpad hover
-                    // adds a temporary lavender highlight; saved mood does not select a card.
-                    val hoverInteraction = remember(option.score) { MutableInteractionSource() }
-                    val isHovered by hoverInteraction.collectIsHoveredAsState()
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .pressScale(hoverInteraction)
-                            .clip(RoundedCornerShape(17.dp))
-                            .background(if (isHovered) SurfaceSelected else SurfaceColor)
-                            .hoverable(interactionSource = hoverInteraction)
-                            .clickable(
-                                interactionSource = hoverInteraction,
-                                indication = null,
-                                onClickLabel = trf("Feeling %1\$s", tr(option.label).lowercase()),
-                                role = Role.Button
-                            ) { onMoodOptionClick(option) }
-                            .padding(vertical = 11.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        MoodFace(score = option.score, selected = isHovered, modifier = Modifier.size(34.dp))
-                        Spacer(Modifier.height(7.dp))
-                        Text(
-                            tr(option.label),
-                            color = if (isHovered) Lavender else TextSecondary,
-                            fontSize = 10.sp,
-                            fontWeight = if (isHovered) {
-                                FontWeight.SemiBold
-                            } else {
-                                FontWeight.Normal
-                            },
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(9.dp))
-
-            Text(
-                tr("Your feelings aren't a problem to solve."),
-                color = TextSecondary,
-                fontSize = 12.sp
-            )
         }
 
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(SurfaceElevated)
-                    .padding(17.dp),
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, TextPrimary.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                    .clickable(role = Role.Button, onClick = onCheckInClick)
+                    .padding(horizontal = 16.dp, vertical = 15.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("☁", fontSize = 27.sp, color = Lavender)
-                Spacer(Modifier.width(13.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        tr("A gentle reminder"),
-                        color = TextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        if (checkedIn) tr("TODAY'S MOOD") else tr("DAILY CHECK-IN"),
+                        color = TextSecondary, style = PixelLabelStyle
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        tr("You don't have to figure everything out today."),
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
+                        if (checkedIn) moodOptions.firstOrNull { it.score == mood }?.label?.let { tr(it) } ?: tr("Okay")
+                        else tr("A few minutes for yourself"),
+                        color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium
                     )
                 }
+                Text(if (checkedIn) tr("Update  →") else tr("Begin  →"), color = Lavender, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
+        item { WeekGlanceCard(remember(allRecords, today) { weekOf(allRecords, today) }, streak) }
+
+        // Only appears once there are enough check-ins for a pattern, and goes away if it is dismissed in Insights.
+        topPattern(allRecords, dismissedInsights)?.let { item { PatternLineCard(it, onInsightsClick) } }
+
+        onThisDayFor(allRecords, today)?.let { item { OnThisDayCard(it) } }
+
+        item { GentleReminderLine(reminder) }
+
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onInsightsClick),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = SurfaceColor
-                )
-            ) {
-                Column(Modifier.padding(19.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                tr("Your mood journey"),
-                                color = TextPrimary,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                tr("Small moments, meaningful patterns"),
-                                color = TextSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        Text(
-                            "↗",
-                            color = Lavender,
-                            fontSize = 22.sp
-                        )
-                    }
-
-                    Spacer(Modifier.height(14.dp))
-
-                    if (records.isEmpty()) {
-                        EmptyState(
-                            emoji = "✧",
-                            title = tr("Your story starts here"),
-                            message = tr("Save a check-in to start seeing your personal mood trend.")
-                        )
-                    } else {
-                        MoodTrendChart(records = records)
-                    }
-                }
+            Column {
+                SmallThingCard(remember(allRecords, today, language) { smallThingFor(allRecords, today) })
+                Spacer(Modifier.height(20.dp))
+                BreatheCard(onExercisesClick)
+                Spacer(Modifier.height(20.dp))
+                HistoryCard(allRecords, onHistoryClick)
             }
         }
+    }
+}
 
-        if (streak > 0) {
-            item { StreakChip(streak) }
+@Composable
+private fun HomeIconButton(label: String, description: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(SurfaceColor)
+                .semantics { contentDescription = description }
+                .clickable(role = Role.Button, onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) { icon() }
+        Text(label, color = TextSecondary, fontSize = 8.sp, letterSpacing = 1.2.sp, fontFamily = PixelFont)
+    }
+}
+
+/** A crisp open-book mark, so it reads clearly as a guide. */
+@Composable
+private fun GuideIcon() {
+    Canvas(modifier = Modifier.size(27.dp)) {
+        val ink = ThemeState.palette.guideInk
+        val strokeWidth = 1.8.dp.toPx()
+        val leftPage = Path().apply {
+            moveTo(size.width * 0.47f, size.height * 0.27f)
+            cubicTo(size.width * 0.34f, size.height * 0.17f, size.width * 0.18f, size.height * 0.18f, size.width * 0.08f, size.height * 0.23f)
+            lineTo(size.width * 0.08f, size.height * 0.76f)
+            cubicTo(size.width * 0.23f, size.height * 0.69f, size.width * 0.37f, size.height * 0.73f, size.width * 0.47f, size.height * 0.84f)
+            close()
         }
+        val rightPage = Path().apply {
+            moveTo(size.width * 0.53f, size.height * 0.27f)
+            cubicTo(size.width * 0.66f, size.height * 0.17f, size.width * 0.82f, size.height * 0.18f, size.width * 0.92f, size.height * 0.23f)
+            lineTo(size.width * 0.92f, size.height * 0.76f)
+            cubicTo(size.width * 0.77f, size.height * 0.69f, size.width * 0.63f, size.height * 0.73f, size.width * 0.53f, size.height * 0.84f)
+            close()
+        }
+        drawPath(leftPage, ink, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+        drawPath(rightPage, ink, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+        drawLine(ink, Offset(size.width * 0.5f, size.height * 0.28f), Offset(size.width * 0.5f, size.height * 0.83f), strokeWidth, cap = StrokeCap.Round)
+        drawLine(ink.copy(alpha = 0.7f), Offset(size.width * 0.17f, size.height * 0.38f), Offset(size.width * 0.34f, size.height * 0.39f), strokeWidth * 0.65f, cap = StrokeCap.Round)
+        drawLine(ink.copy(alpha = 0.7f), Offset(size.width * 0.66f, size.height * 0.39f), Offset(size.width * 0.83f, size.height * 0.38f), strokeWidth * 0.65f, cap = StrokeCap.Round)
+    }
+}
 
-        item {
-            HomeQuickTools(
-                onCheckInClick = onCheckInClick,
-                onInsightsClick = onInsightsClick,
-                onResourceClick = onResourceClick,
-                onHistoryClick = onHistoryClick,
-                onExercisesClick = onExercisesClick
+/** Four rounded tiles: the tools and support behind this button. */
+@Composable
+private fun ResourcesIcon() {
+    Canvas(modifier = Modifier.size(26.dp)) {
+        val ink = ThemeState.palette.guideInk
+        val gap = size.width * 0.12f
+        val tile = (size.width - gap) / 2f
+        val radius = androidx.compose.ui.geometry.CornerRadius(tile * 0.28f)
+        for (row in 0..1) for (col in 0..1) {
+            drawRoundRect(
+                color = if (row == 0 && col == 1) ink.copy(alpha = 0.55f) else ink,
+                topLeft = Offset(col * (tile + gap), row * (tile + gap)),
+                size = androidx.compose.ui.geometry.Size(tile, tile),
+                cornerRadius = radius
             )
         }
     }

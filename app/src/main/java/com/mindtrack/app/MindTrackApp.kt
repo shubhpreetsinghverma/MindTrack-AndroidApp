@@ -1,5 +1,7 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.geometry.Size
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -132,7 +134,6 @@ internal fun MindTrackApp(
     var showHistory by remember { mutableStateOf(false) }
     var showPrivacy by remember { mutableStateOf(false) }
     var showExercises by remember { mutableStateOf(false) }
-    var selectedMoodForDetails by remember { mutableStateOf<MoodOption?>(null) }
 
     LaunchedEffect(quickMood) {
         if (quickMood != null) {
@@ -208,13 +209,15 @@ internal fun MindTrackApp(
                             checkedIn = vm.checkedIn,
                             records = vm.recentRecords,
                             streak = vm.streak,
+                            allRecords = vm.allRecords,
+                            dismissedInsights = vm.dismissed,
+                            onInsightsClick = { selectedTab = AppTab.INSIGHTS },
+                            name = accountVm.displayName,
                             onHistoryClick = { showHistory = true },
                             onExercisesClick = { showExercises = true },
                             onCheckInClick = { selectedTab = AppTab.MOOD },
-                            onInsightsClick = { selectedTab = AppTab.INSIGHTS },
-                            onResourceClick = { showResourceCentre = true },
-                            onAboutClick = { showAboutMindTrack = true },
-                            onMoodOptionClick = { selectedMoodForDetails = it }
+                            onResourcesClick = { showResourceCentre = true },
+                            onGuideClick = { showAboutMindTrack = true }
                         )
 
                         "MOOD" -> MoodScreen(
@@ -262,9 +265,6 @@ internal fun MindTrackApp(
                             onHistoryClick = { showHistory = true },
                             onInsightsClick = { selectedTab = AppTab.INSIGHTS },
                             account = accountVm,
-                            memoryCount = companionVm.memoryCount,
-                            memorySince = companionVm.memorySince,
-                            onClearMemory = { companionVm.clearMemory() },
                             onPrivacyClick = { showPrivacy = true },
                             onDeleteAccount = { password -> vm.deleteAccount { vm.reauthenticateWithPassword(password) } },
                             onDeleteAccountWithGoogle = {
@@ -293,49 +293,41 @@ internal fun MindTrackApp(
         }
 
         if (vm.showSupport) SupportDialog(onDismiss = { vm.showSupport = false })
-
-        selectedMoodForDetails?.let { option ->
-            MoodDetailDialog(
-                option = option,
-                onDismiss = { selectedMoodForDetails = null },
-                onContinue = {
-                    vm.mood = option.score
-                    selectedMoodForDetails = null
-                    selectedTab = AppTab.MOOD
-                    showResourceCentre = false
-                    showAboutMindTrack = false
-                    showHistory = false
-                }
-            )
-        }
     }
+}
+
+/** Pixel faces for the five moods, drawn on an 11 by 11 grid so they match the little moon. */
+private const val FACE_GRID = 11
+
+private val faceDisc: List<Triple<Int, Int, Double>> = buildList {
+    for (y in 0 until FACE_GRID) for (x in 0 until FACE_GRID) {
+        add(Triple(x, y, Math.hypot(x - 5.0, y - 5.0)))
+    }
+}
+
+/** Eye and mouth pixels for a mood score from 1 (Rough) to 5 (Great). Eyes are two pixels tall so they read at small sizes. */
+internal fun faceFeatures(score: Int): List<Pair<Int, Int>> = when (score) {
+    5 -> listOf(2 to 4, 3 to 3, 4 to 4, 6 to 4, 7 to 3, 8 to 4, 3 to 6, 4 to 7, 5 to 7, 6 to 7, 7 to 6)
+    4 -> listOf(3 to 3, 3 to 4, 7 to 3, 7 to 4, 3 to 6, 4 to 7, 5 to 7, 6 to 7, 7 to 6)
+    3 -> listOf(3 to 3, 3 to 4, 7 to 3, 7 to 4, 4 to 7, 5 to 7, 6 to 7)
+    2 -> listOf(3 to 3, 3 to 4, 7 to 3, 7 to 4, 3 to 8, 4 to 7, 5 to 7, 6 to 7, 7 to 8)
+    else -> listOf(2 to 2, 3 to 3, 3 to 5, 7 to 5, 8 to 2, 7 to 3, 3 to 8, 4 to 7, 5 to 7, 6 to 7, 7 to 8)
 }
 
 @Composable
 internal fun MoodFace(score: Int, selected: Boolean, modifier: Modifier = Modifier) {
-    val faceColor = if (selected) Lavender else Lavender.copy(alpha = 0.82f)
+    val ink = if (selected) Lavender else Lavender.copy(alpha = 0.82f)
+    val features = remember(score) { faceFeatures(score) }
     Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val center = Offset(w / 2f, h / 2f)
-        drawCircle(color = faceColor.copy(alpha = if (selected) 0.20f else 0.11f), radius = w * 0.46f, center = center)
-        drawCircle(color = faceColor, radius = w * 0.43f, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.045f))
-        val eyeY = h * 0.40f
-        drawCircle(color = faceColor, radius = w * 0.045f, center = Offset(w * 0.35f, eyeY))
-        drawCircle(color = faceColor, radius = w * 0.045f, center = Offset(w * 0.65f, eyeY))
-        val mouth = Path()
-        when (score) {
-            5 -> { mouth.moveTo(w * 0.28f, h * 0.56f); mouth.cubicTo(w * 0.38f, h * 0.78f, w * 0.62f, h * 0.78f, w * 0.72f, h * 0.56f) }
-            4 -> { mouth.moveTo(w * 0.32f, h * 0.59f); mouth.cubicTo(w * 0.42f, h * 0.72f, w * 0.58f, h * 0.72f, w * 0.68f, h * 0.59f) }
-            3 -> { mouth.moveTo(w * 0.34f, h * 0.62f); mouth.lineTo(w * 0.66f, h * 0.62f) }
-            2 -> { mouth.moveTo(w * 0.31f, h * 0.70f); mouth.cubicTo(w * 0.42f, h * 0.54f, w * 0.58f, h * 0.54f, w * 0.69f, h * 0.70f) }
-            else -> {
-                mouth.moveTo(w * 0.30f, h * 0.70f); mouth.cubicTo(w * 0.40f, h * 0.52f, w * 0.60f, h * 0.52f, w * 0.70f, h * 0.70f)
-                drawLine(faceColor, Offset(w * 0.27f, h * 0.28f), Offset(w * 0.42f, h * 0.32f), strokeWidth = w * 0.04f, cap = StrokeCap.Round)
-                drawLine(faceColor, Offset(w * 0.58f, h * 0.32f), Offset(w * 0.73f, h * 0.28f), strokeWidth = w * 0.04f, cap = StrokeCap.Round)
-            }
+        // Whole-pixel cells, centred, so neighbouring squares meet without seams.
+        val cell = kotlin.math.floor(size.width / FACE_GRID).coerceAtLeast(1f)
+        val origin = (size.width - cell * FACE_GRID) / 2f
+        val pixel = Size(cell, cell)
+        if (selected) drawCircle(ink.copy(alpha = 0.16f), radius = cell * 4.7f, center = Offset(origin + cell * 5.5f, origin + cell * 5.5f))
+        faceDisc.forEach { (x, y, d) ->
+            if (d in 4.15..5.4) drawRect(ink, Offset(origin + x * cell, origin + y * cell), pixel)
         }
-        drawPath(path = mouth, color = faceColor, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.055f, cap = StrokeCap.Round))
+        features.forEach { (x, y) -> drawRect(ink, Offset(origin + x * cell, origin + y * cell), pixel) }
     }
 }
 
@@ -390,43 +382,46 @@ internal fun ResourceCentreScreen(onBack: () -> Unit) {
     )
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Background),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 30.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
             TextButton(onClick = onBack) { Text(tr("←  Back to MindTrack"), color = Lavender) }
+            PixelMoon(size = 48.dp, mood = MoonMood.SLEEPY, modifier = Modifier.padding(start = 2.dp, bottom = 10.dp).clearAndSetSemantics {})
             ScreenHeader(eyebrow = tr("TRUSTED INFORMATION"), title = tr("Resource centre"), subtitle = tr("Clear, reliable information to help you understand your wellbeing and find support."))
         }
         item {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceElevated).padding(18.dp)) {
-                Text(tr("A note before you begin"), color = Lavender, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(7.dp))
-                Text(tr("These resources are for education and support, not diagnosis. MindTrack does not replace a qualified mental health professional."), color = TextPrimary, fontSize = 13.sp, lineHeight = 20.sp)
+            HomeSection {
+                Text(tr("A note before you begin").uppercase(), color = Lavender, style = PixelLabelStyle)
+                Spacer(Modifier.height(8.dp))
+                Text(tr("These resources are for education and support, not diagnosis. MindTrack does not replace a qualified mental health professional."), color = TextPrimary, fontSize = 14.sp, lineHeight = 21.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
             }
         }
         item {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceColor).padding(18.dp)) {
-                Text(tr("Need to talk to someone right now?"), color = Coral, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            HomeSection {
+                Text(tr("Need to talk to someone right now?"), color = Coral, fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(6.dp))
-                Text(tr("These services are free and confidential. Tap one to call."), color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                Spacer(Modifier.height(12.dp))
+                Text(tr("These services are free and confidential. Tap one to call."), color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+                Spacer(Modifier.height(10.dp))
                 HelplineList()
             }
         }
         items(resources) { resource ->
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(SurfaceColor)
-                    .clickable {
+            HomeSection {
+              Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button) {
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(resource.url))) }
-                    }.padding(18.dp)
-            ) {
-                Text(resource.category, color = Lavender, fontSize = 10.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.SemiBold)
+                    }
+              ) {
+                Text(resource.category, color = Lavender, style = PixelLabelStyle)
                 Spacer(Modifier.height(6.dp))
-                Text(resource.title, color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(resource.title, color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(5.dp))
                 Text(resource.description, color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
                 Spacer(Modifier.height(10.dp))
-                Text(tr("Open official resource  ↗"), color = Lavender, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(tr("Open official resource  ↗"), color = Lavender, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+              }
             }
         }
         item {

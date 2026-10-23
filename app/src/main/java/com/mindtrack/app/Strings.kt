@@ -20,7 +20,7 @@ internal object Lang {
     var current: AppLanguage = AppLanguage.ENGLISH
 }
 
-private val hindiAll: Map<String, String> by lazy { hindiStrings + hindiLongStrings }
+internal val hindiAll: Map<String, String> by lazy { hindiStrings + hindiLongStrings + hindiHomeStrings }
 
 private fun translationsFor(language: AppLanguage): Map<String, String> = when (language) {
     AppLanguage.ENGLISH -> emptyMap()

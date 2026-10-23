@@ -26,7 +26,20 @@ internal class AuthViewModel(app: Application) : AndroidViewModel(app) {
     var info by mutableStateOf<String?>(null)
         private set
 
-    private val listener = FirebaseAuth.AuthStateListener { uid = it.currentUser?.uid }
+    /** Email-and-password accounts must confirm their address before the app opens. */
+    var needsVerification by mutableStateOf(currentNeedsVerification())
+        private set
+    val email: String get() = auth.currentUser?.email.orEmpty()
+
+    private fun currentNeedsVerification(): Boolean {
+        val user = auth.currentUser ?: return false
+        return requiresEmailVerification(user.providerData.map { it.providerId }, user.isEmailVerified)
+    }
+
+    private val listener = FirebaseAuth.AuthStateListener {
+        uid = it.currentUser?.uid
+        needsVerification = currentNeedsVerification()
+    }
 
     init {
         auth.addAuthStateListener(listener)
@@ -112,6 +125,33 @@ internal class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 isLoading = false
             }
         }
+    }
+
+    /** Sends a fresh verification link. Returns a short message for the screen. */
+    suspend fun resendVerification(): String = try {
+        repository.sendVerificationEmail()
+        tr("Verification email sent.")
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        tr("Couldn't send the email. Please try again later.")
+    }
+
+    /** Re-reads the account. Returns null once verified (the app then opens), otherwise a message. */
+    suspend fun recheckVerification(quiet: Boolean = false): String? = try {
+        if (repository.refreshVerified()) {
+            needsVerification = false
+            null
+        } else if (quiet) null else tr("Not verified yet. Open the link in the email first.")
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        if (quiet) null else tr("Couldn't check right now. Please try again.")
+    }
+
+    fun signOutUnverified() {
+        auth.signOut()
+        clearMessages()
     }
 
     fun sendPasswordReset(email: String) {
@@ -266,3 +306,7 @@ internal class SuggestionsViewModel(app: Application, uid: String?) : AndroidVie
         }
     }
 }
+
+/** Google accounts are already verified by Google, so only password accounts are held at the verification screen. */
+internal fun requiresEmailVerification(providerIds: List<String>, emailVerified: Boolean): Boolean =
+    "password" in providerIds && !emailVerified

@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,12 +49,17 @@ fun FirebaseAuthGate(
 ) {
     val vm: AuthViewModel = viewModel()
     val uid = vm.uid
-    if (uid != null) content(uid) else AuthScreen(vm)
+    when {
+        uid == null -> AuthScreen(vm)
+        vm.needsVerification -> VerifyEmailScreen(vm)
+        else -> content(uid)
+    }
 }
 
 @Composable
 internal fun AuthScreen(vm: AuthViewModel) {
-    var isRegistering by remember { mutableStateOf(false) }
+    // New people see sign-up first; "Already have an account?" switches to "Welcome back."
+    var isRegistering by remember { mutableStateOf(true) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
@@ -79,13 +85,15 @@ internal fun AuthScreen(vm: AuthViewModel) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(text = tr("✳ MindTrack"), color = Lavender, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                PixelMoon(size = 56.dp, mood = if (isRegistering) MoonMood.HAPPY else MoonMood.SLEEPY, modifier = Modifier.clearAndSetSemantics {})
+                Spacer(Modifier.height(12.dp))
+                Text(text = tr("MindTrack").uppercase(), color = Lavender, style = PixelLabelStyle.copy(fontSize = 13.sp))
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(22.dp))
 
                 Text(
                     text = if (isRegistering) tr("A little space just for you.") else tr("Welcome back."),
-                    color = TextPrimary, fontSize = 30.sp, fontWeight = FontWeight.Bold
+                    color = TextPrimary, fontSize = 30.sp, fontWeight = FontWeight.Medium
                 )
 
                 Spacer(Modifier.height(8.dp))
@@ -105,6 +113,8 @@ internal fun AuthScreen(vm: AuthViewModel) {
                         label = { Text(tr("Your name")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = quietFieldColors(),
                         enabled = !isLoading
                     )
                     Spacer(Modifier.height(12.dp))
@@ -116,6 +126,8 @@ internal fun AuthScreen(vm: AuthViewModel) {
                     label = { Text(tr("Email address")) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = quietFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading
                 )
@@ -134,6 +146,8 @@ internal fun AuthScreen(vm: AuthViewModel) {
                             Text(if (showPassword) tr("Hide") else tr("Show"), color = Lavender, fontSize = 12.sp)
                         }
                     },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = quietFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading
                 )
@@ -156,8 +170,8 @@ internal fun AuthScreen(vm: AuthViewModel) {
                         else vm.signIn(email, password)
                     },
                     enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Lavender, contentColor = Background)
                 ) {
                     if (isLoading) {
@@ -173,8 +187,9 @@ internal fun AuthScreen(vm: AuthViewModel) {
                 androidx.compose.material3.OutlinedButton(
                     onClick = { activity?.let { vm.signInWithGoogle(it) } },
                     enabled = !isLoading && activity != null,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border)
                 ) {
                     androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.foundation.Image(

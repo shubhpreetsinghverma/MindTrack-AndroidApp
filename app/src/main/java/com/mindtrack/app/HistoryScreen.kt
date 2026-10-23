@@ -1,5 +1,7 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,7 +57,7 @@ import java.util.Locale
 
 private fun prettyDate(date: String): String =
     runCatching {
-        LocalDate.parse(date).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
+        LocalDate.parse(date).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(appLocale()))
     }.getOrDefault(date)
 
 @Composable
@@ -75,7 +77,7 @@ internal fun HistoryScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Background),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 30.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -93,22 +95,18 @@ internal fun HistoryScreen(
         }
 
         item {
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SurfaceColor).padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            // Two plain tabs with an underline, like a cursor under the active one.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 listOf(false to tr("List"), true to tr("Calendar")).forEach { (isCalendar, label) ->
                     val selected = calendarView == isCalendar
-                    Box(
+                    Column(
                         Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(if (selected) SurfaceSelected else androidx.compose.ui.graphics.Color.Transparent)
                             .selectable(selected = selected, role = Role.Tab, onClick = { calendarView = isCalendar })
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(vertical = 6.dp)
                     ) {
-                        Text(label, color = if (selected) Lavender else TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(label, color = if (selected) Lavender else TextSecondary, style = PixelLabelStyle.copy(fontSize = 13.sp))
+                        Spacer(Modifier.height(5.dp))
+                        Box(Modifier.size(width = 26.dp, height = 3.dp).background(if (selected) Lavender else androidx.compose.ui.graphics.Color.Transparent))
                     }
                 }
             }
@@ -128,19 +126,18 @@ internal fun HistoryScreen(
                     Modifier
                         .pressScale(press)
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SurfaceColor)
                         .clickable(
                             interactionSource = press, indication = null,
                             onClickLabel = tr("Edit entry"), role = Role.Button
                         ) { editing = record }
-                        .padding(16.dp)
+                        .drawBehind { drawLine(Border, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), strokeWidth = 1.dp.toPx()) }
+                        .padding(top = 6.dp, bottom = 18.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        MoodFace(score = record.mood, selected = true, modifier = Modifier.size(44.dp))
+                        MoodFace(score = record.mood, selected = true, modifier = Modifier.size(44.dp).clearAndSetSemantics {})
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(prettyDate(record.date), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(prettyDate(record.date), color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 trf("%1\$s  ·  Stress %2\$d/5  ·  Energy %3\$d/5", tr(option?.label ?: "Mood"), record.stress, record.energy),
@@ -151,11 +148,11 @@ internal fun HistoryScreen(
                     }
                     if (record.tags.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
-                        Text(record.tags.joinToString("  ·  "), color = Lavender, fontSize = 11.sp)
+                        Text(record.tags.joinToString("  ·  ") { tr(it) }, color = Lavender, style = PixelLabelStyle.copy(fontSize = 10.sp, letterSpacing = 0.6.sp))
                     }
                     if (record.journal.isNotBlank()) {
                         Spacer(Modifier.height(10.dp))
-                        Text(record.journal, color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+                        Text(record.journal, color = TextSecondary, fontSize = 14.sp, lineHeight = 21.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                     }
                 }
             }
@@ -191,12 +188,12 @@ private fun MonthCalendar(byDate: Map<String, CheckInRecord>, onPick: (CheckInRe
     val cells = leading + month.lengthOfMonth()
     val rows = (cells + 6) / 7
 
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(16.dp)) {
+    HomeSection {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = { month = month.minusMonths(1) }) { Text("‹", color = Lavender, fontSize = 22.sp) }
             Text(
                 "${month.month.getDisplayName(TextStyle.FULL, appLocale())} ${month.year}",
-                color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold
+                color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium
             )
             TextButton(onClick = { month = month.plusMonths(1) }, enabled = month < YearMonth.now()) {
                 Text("›", color = if (month < YearMonth.now()) Lavender else TextSecondary, fontSize = 22.sp)
@@ -205,7 +202,7 @@ private fun MonthCalendar(byDate: Map<String, CheckInRecord>, onPick: (CheckInRe
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth()) {
             listOf("M", "T", "W", "T", "F", "S", "S").forEach {
-                Text(it, color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                Text(it, color = TextSecondary, style = PixelLabelStyle.copy(fontSize = 11.sp), textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -222,10 +219,10 @@ private fun MonthCalendar(byDate: Map<String, CheckInRecord>, onPick: (CheckInRe
                             Box(
                                 Modifier
                                     .fillMaxSize()
-                                    .clip(CircleShape)
+                                    .clip(RoundedCornerShape(8.dp))
                                     .background(if (record != null) moodColorFor(record.mood) else androidx.compose.ui.graphics.Color.Transparent)
-                                    .then(if (isToday) Modifier.border(1.5.dp, Lavender, CircleShape) else Modifier)
-                                    .then(if (addable) Modifier.border(1.dp, Lavender.copy(alpha = 0.45f), CircleShape) else Modifier)
+                                    .then(if (isToday) Modifier.border(1.5.dp, TextPrimary, RoundedCornerShape(8.dp)) else Modifier)
+                                    .then(if (addable) Modifier.border(1.dp, Lavender.copy(alpha = 0.5f), RoundedCornerShape(8.dp)) else Modifier)
                                     .then(
                                         when {
                                             record != null -> Modifier.clickable(
@@ -264,7 +261,7 @@ private fun MonthCalendar(byDate: Map<String, CheckInRecord>, onPick: (CheckInRe
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             moodOptions.reversed().forEach {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(moodColorFor(it.score)))
+                    Box(Modifier.size(9.dp).background(moodColorFor(it.score)))
                     Spacer(Modifier.width(4.dp))
                     Text(tr(it.label), color = TextSecondary, fontSize = 10.sp)
                 }
@@ -316,16 +313,15 @@ private fun BackfillDialog(
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(trf("%1\$s: %2\$d / 5", tr("Stress level"), stress), color = TextSecondary, fontSize = 12.sp)
-                androidx.compose.material3.Slider(
-                    value = stress.toFloat(), onValueChange = { stress = it.toInt().coerceIn(1, 5) },
-                    valueRange = 1f..5f, steps = 3
-                )
+                Spacer(Modifier.height(6.dp))
+                BlockMeter(tr("Stress level"), stress) { stress = it }
+                Spacer(Modifier.height(10.dp))
                 Text(trf("%1\$s: %2\$d / 5", tr("Energy level"), energy), color = TextSecondary, fontSize = 12.sp)
-                androidx.compose.material3.Slider(
-                    value = energy.toFloat(), onValueChange = { energy = it.toInt().coerceIn(1, 5) },
-                    valueRange = 1f..5f, steps = 3
-                )
+                Spacer(Modifier.height(6.dp))
+                BlockMeter(tr("Energy level"), energy) { energy = it }
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
+        colors = quietFieldColors(),
                     value = note,
                     onValueChange = { if (it.length <= 2000) note = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -395,6 +391,7 @@ private fun EditEntryDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
+        colors = quietFieldColors(),
                     value = text,
                     onValueChange = { if (it.length <= 2000) text = it },
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),

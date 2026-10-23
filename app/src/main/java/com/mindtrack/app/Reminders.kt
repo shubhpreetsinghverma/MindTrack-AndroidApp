@@ -160,7 +160,7 @@ internal fun ReminderCard() {
     }
 
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)
+        Modifier.fillMaxWidth().flatSection()
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.weight(1f)) {

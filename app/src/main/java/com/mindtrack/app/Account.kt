@@ -91,6 +91,7 @@ internal fun DeleteAccountSection(usesPassword: Boolean, onDelete: suspend (pass
                     if (usesPassword) {
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
+        colors = quietFieldColors(),
                             value = password,
                             onValueChange = { password = it; error = null },
                             label = { Text(tr("Password")) },

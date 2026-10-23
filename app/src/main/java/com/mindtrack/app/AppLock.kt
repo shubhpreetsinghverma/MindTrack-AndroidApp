@@ -155,7 +155,7 @@ internal fun AppLockCard() {
     val prefs = remember { settingsPrefs(context) }
     var notice by remember { mutableStateOf<String?>(null) }
 
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)) {
+    Column(Modifier.fillMaxWidth().flatSection()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
                 Text(tr("App lock"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)

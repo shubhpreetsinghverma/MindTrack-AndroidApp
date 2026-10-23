@@ -1,5 +1,7 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.border
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -132,85 +134,60 @@ internal fun MoodScreen(
         }
 
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(23.dp))
-                    .background(SurfaceColor)
-                    .padding(18.dp)
-            ) {
-                Text(
-                    tr("What's your mood today?"),
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            val current = moodOptions.first { it.score == mood }
+            Column(Modifier.fillMaxWidth()) {
+                Text(tr("What's your mood today?"), color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(4.dp))
+                Text(tr("Choose the feeling that comes closest."), color = TextSecondary, fontSize = 13.sp)
+                Spacer(Modifier.height(18.dp))
 
-                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PixelMoon(size = 46.dp, mood = moonMoodFor(mood), modifier = Modifier.clearAndSetSemantics {})
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(tr(current.description), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.height(3.dp))
+                        Text(tr(current.meaning), color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                    }
+                }
 
-                Text(
-                    tr("Choose the feeling that comes closest."),
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
-
-                Spacer(Modifier.height(15.dp))
-
-                moodOptions.forEach { option ->
-                    val selected = mood == option.score
-                    val press = remember { MutableInteractionSource() }
-
-                    Row(
-                        modifier = Modifier
-                            .pressScale(press)
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (selected) SurfaceSelected
-                                else Color.Transparent
-                            )
-                            .selectable(
-                                selected = selected,
-                                interactionSource = press,
-                                indication = null,
-                                role = Role.RadioButton
-                            ) { onMoodChange(option.score) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
+                Spacer(Modifier.height(18.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    moodOptions.forEach { option ->
+                        val selected = mood == option.score
+                        val press = remember { MutableInteractionSource() }
+                        Column(
                             modifier = Modifier
-                                .size(45.dp)
-                                .clip(RoundedCornerShape(13.dp))
-                                .background(
-                                    if (selected) Lavender.copy(alpha = 0.12f)
-                                    else SurfaceElevated
-                                ),
-                            contentAlignment = Alignment.Center
+                                .pressScale(press)
+                                .selectable(
+                                    selected = selected,
+                                    interactionSource = press,
+                                    indication = null,
+                                    role = Role.RadioButton
+                                ) { onMoodChange(option.score) },
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            MoodFace(score = option.score, selected = selected, modifier = Modifier.size(30.dp))
-                        }
-
-                        Spacer(Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(RoundedCornerShape(15.dp))
+                                    .background(if (selected) Lavender.copy(alpha = 0.16f) else Color.Transparent)
+                                    .border(
+                                        if (selected) 1.5.dp else 1.dp,
+                                        if (selected) Lavender else Border,
+                                        RoundedCornerShape(15.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                MoodFace(score = option.score, selected = selected, modifier = Modifier.size(34.dp))
+                            }
+                            Spacer(Modifier.height(5.dp))
                             Text(
                                 tr(option.label),
-                                color = if (selected) Lavender else TextPrimary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
+                                color = if (selected) Lavender else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                             )
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                tr(option.description),
-                                color = TextSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        if (selected) {
-                            Text("✓", color = Lavender, fontSize = 20.sp)
                         }
                     }
                 }
@@ -240,9 +217,7 @@ internal fun MoodScreen(
         }
 
         item {
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceColor).padding(18.dp)
-            ) {
+            HomeSection {
                 Text(tr("What's been on your mind?"), color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(5.dp))
                 Text(
@@ -255,21 +230,12 @@ internal fun MoodScreen(
         }
 
         item {
-            Column {
-                Text(
-                    tr("Put it into words"),
-                    color = TextPrimary,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            HomeSection {
+                Text(tr("Put it into words"), color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Medium)
 
                 Spacer(Modifier.height(6.dp))
 
-                Text(
-                    tr("Sometimes writing it down helps you understand it."),
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
+                Text(tr("Sometimes writing it down helps you understand it."), color = TextSecondary, fontSize = 13.sp)
 
                 Spacer(Modifier.height(12.dp))
 
@@ -282,12 +248,16 @@ internal fun MoodScreen(
                         .fillMaxWidth()
                         .height(150.dp),
                     placeholder = {
-                        Text(
-                            tr("Today, I've been thinking about..."),
-                            color = TextSecondary
-                        )
+                        Text(tr("Today, I've been thinking about..."), color = TextSecondary)
                     },
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Lavender,
+                        unfocusedBorderColor = Border,
+                        cursorColor = Lavender,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
                     maxLines = 6,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences
@@ -299,7 +269,7 @@ internal fun MoodScreen(
                 Text(
                     trf("%1\$d/2000 characters", journalState.value.length),
                     color = TextSecondary,
-                    fontSize = 11.sp,
+                    style = PixelLabelStyle.copy(fontSize = 10.sp, letterSpacing = 0.6.sp),
                     modifier = Modifier.align(Alignment.End)
                 )
             }

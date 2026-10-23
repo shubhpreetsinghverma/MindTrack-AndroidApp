@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -149,8 +150,8 @@ internal fun ExercisesScreen(onBack: () -> Unit) {
     when (kind) {
         null -> LazyColumn(
             modifier = Modifier.fillMaxSize().background(Background),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 30.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
                 TextButton(onClick = onBack) { Text(tr("←  Back to MindTrack"), color = Lavender) }
@@ -159,19 +160,20 @@ internal fun ExercisesScreen(onBack: () -> Unit) {
                     title = tr("Breathe and ground"),
                     subtitle = tr("Short exercises you can do anywhere. Stop whenever you like.")
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
                 voiceBar()
+                Spacer(Modifier.height(6.dp))
             }
             breathingPatterns.forEach { p ->
                 item {
-                    ExerciseCard(tr(p.name), tr(p.description), "◌") { pattern = p; kind = ExerciseKind.BREATHING }
+                    ExerciseCard(tr(p.name), tr(p.description), "◌", exercisePurpose(p.name)) { pattern = p; kind = ExerciseKind.BREATHING }
                 }
             }
             item {
-                ExerciseCard(tr("5-4-3-2-1 grounding"), tr("Use your senses to come back to the present moment."), "✧") { kind = ExerciseKind.GROUNDING }
+                ExerciseCard(tr("5-4-3-2-1 grounding"), tr("Use your senses to come back to the present moment."), "✧", exercisePurpose("5-4-3-2-1 grounding")) { kind = ExerciseKind.GROUNDING }
             }
             item {
-                ExerciseCard(tr("Body relaxation"), tr("Tense and release each part of your body in turn."), "☾") { kind = ExerciseKind.RELAXATION }
+                ExerciseCard(tr("Body relaxation"), tr("Tense and release each part of your body in turn."), "☾", exercisePurpose("Body relaxation")) { kind = ExerciseKind.RELAXATION }
             }
             item {
                 Text(
@@ -186,28 +188,65 @@ internal fun ExercisesScreen(onBack: () -> Unit) {
     }
 }
 
+/** What each exercise is good for, in plain words. Wellbeing guidance, not treatment. */
+internal fun exercisePurpose(name: String): String = when (name) {
+    "Box breathing" -> tr("When you feel overwhelmed, your thoughts are racing, or something stressful is coming up. The even rhythm gives your mind something steady to follow.")
+    "4-7-8 breathing" -> tr("When you want to wind down before sleep or settle restless energy. The long, slow out-breath helps your body relax. Hold for less time if it feels strained.")
+    "Calm breathing" -> tr("For everyday stress and a quick reset. Breathing out for longer than you breathe in is a gentle way to slow down, and you can do it anywhere.")
+    "5-4-3-2-1 grounding" -> tr("When you feel anxious or your thoughts keep spiralling. Naming what you can see, touch, hear, smell and taste brings your attention back to the present.")
+    "Body relaxation" -> tr("When you feel tense, tired, or can't switch off. Tensing and then releasing each part of your body helps you notice where you hold stress.")
+    else -> ""
+}
+
+/** Little pixel pictures for the exercises: a square that breathes, an eye, and a figure at rest. */
+private val exerciseGlyphs: Map<String, List<String>> = mapOf(
+    "breath" to listOf(".........", "..#####..", ".#.....#.", ".#.###.#.", ".#.###.#.", ".#.###.#.", ".#.....#.", "..#####..", "........."),
+    "ground" to listOf(".........", ".........", "..#####..", ".#.###.#.", "#.##.##.#", ".#.###.#.", "..#####..", ".........", "........."),
+    "relax" to listOf(".........", "..##.....", ".####....", ".####....", "..##.....", "#########", ".#######.", "..#####..", ".........")
+)
+
 @Composable
-private fun ExerciseCard(title: String, description: String, symbol: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(SurfaceColor)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Lavender.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center
-        ) { Text(symbol, color = Lavender, fontSize = 22.sp) }
-        Spacer(Modifier.size(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(3.dp))
-            Text(description, color = TextSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+private fun ExerciseGlyph(kind: String) {
+    val rows = exerciseGlyphs.getValue(kind)
+    androidx.compose.foundation.Canvas(Modifier.size(30.dp)) {
+        val unit = kotlin.math.floor(size.width / 9f).coerceAtLeast(1f)
+        val origin = (size.width - unit * 9f) / 2f
+        rows.forEachIndexed { y, row ->
+            row.forEachIndexed { x, ch ->
+                if (ch == '#') drawRect(Lavender, Offset(origin + x * unit, origin + y * unit), androidx.compose.ui.geometry.Size(unit, unit))
+            }
         }
-        Text("›", color = Lavender, fontSize = 22.sp)
+    }
+}
+
+@Composable
+private fun ExerciseCard(title: String, description: String, symbol: String, purpose: String = "", onClick: () -> Unit) {
+    val glyph = when (symbol) { "✧" -> "ground"; "☾" -> "relax"; else -> "breath" }
+    HomeSection {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(bottom = 12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.clearAndSetSemantics {}) { ExerciseGlyph(glyph) }
+                Spacer(Modifier.size(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(3.dp))
+                    Text(description, color = TextSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+                }
+                Text("›", color = Lavender, fontSize = 22.sp, modifier = Modifier.clearAndSetSemantics {})
+            }
+            if (purpose.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text(tr("GOOD FOR"), color = Lavender, style = PixelLabelStyle.copy(fontSize = 10.sp))
+                Spacer(Modifier.height(4.dp))
+                Text(purpose, color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+            }
+        }
     }
 }
 
@@ -267,61 +306,57 @@ private fun BreathingSession(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
             TextButton(onClick = onClose) { Text(tr("←  Back"), color = Lavender) }
         }
-        Text(tr(pattern.name), color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Text(tr(pattern.description), color = TextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 19.sp)
-        Spacer(Modifier.height(10.dp))
+        Text(tr(pattern.name).uppercase(), color = Lavender, style = PixelLabelStyle)
+        Spacer(Modifier.height(6.dp))
+        Text(tr(pattern.description), color = TextSecondary, fontSize = 14.sp, textAlign = TextAlign.Center, lineHeight = 21.sp)
+        Spacer(Modifier.height(12.dp))
         voiceBar()
 
         Spacer(Modifier.weight(1f))
 
-        val lavender = Lavender
-        Box(Modifier.size(260.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) {
-                val maxR = size.minDimension / 2f
-                val r = maxR * (0.42f + 0.58f * state.size)
-                drawCircle(
-                    brush = Brush.radialGradient(listOf(lavender.copy(alpha = 0.30f), Color.Transparent), radius = maxR),
-                    radius = maxR, center = center
-                )
-                drawCircle(lavender.copy(alpha = 0.16f), radius = r, center = center)
-                drawCircle(lavender, radius = r, center = center, style = Stroke(width = 2.5.dp.toPx()))
+        BreathingMoon(
+            size = state.size,
+            running = running,
+            finished = finished,
+            phaseLabel = if (running || elapsedMs > 0 && !finished) tr(state.phase.label) else null,
+            secondsLeft = state.secondsLeft,
+            idleLabel = when {
+                preparing -> tr("Listen…")
+                finished -> tr("Well done")
+                else -> tr("Ready?")
             }
-            if (running || elapsedMs > 0 && !finished) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(tr(state.phase.label), color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${state.secondsLeft}", color = Lavender, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                Text(
-                    when {
-                        preparing -> tr("Listen…")
-                        finished -> tr("Well done")
-                        else -> tr("Ready?")
-                    },
-                    color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold
-                )
+        )
+
+        Spacer(Modifier.height(18.dp))
+        // Time left, as a row of little blocks that fill in.
+        val total = minutes * 60_000f
+        val blocks = 24
+        val filled = ((elapsedMs / total) * blocks).toInt().coerceIn(0, blocks)
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            repeat(blocks) { i ->
+                Box(Modifier.size(width = 8.dp, height = 8.dp).background(if (i < filled) Lavender else Border))
             }
         }
 
         Spacer(Modifier.weight(1f))
 
         if (!running && !preparing) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 lengths.forEach { m ->
                     val selected = minutes == m
-                    Box(
+                    Column(
                         Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) Lavender.copy(alpha = 0.2f) else SurfaceElevated)
                             .selectable(selected = selected, role = Role.RadioButton, onClick = { minutes = m; elapsedMs = 0; finished = false })
-                            .padding(horizontal = 18.dp, vertical = 10.dp)
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(trf("%1\$d min", m), color = if (selected) Lavender else TextSecondary, fontSize = 13.sp)
+                        Text(trf("%1\$d min", m), color = if (selected) Lavender else TextSecondary, style = PixelLabelStyle.copy(fontSize = 13.sp))
+                        Spacer(Modifier.height(5.dp))
+                        Box(Modifier.size(width = 26.dp, height = 3.dp).background(if (selected) Lavender else Color.Transparent))
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
         }
 
         Button(
@@ -339,8 +374,8 @@ private fun BreathingSession(
                 }
             },
             enabled = !preparing,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Lavender, contentColor = Background)
         ) {
             Text(
@@ -379,27 +414,24 @@ private fun StepSession(
 
     Column(Modifier.fillMaxSize().background(Background).padding(20.dp)) {
         TextButton(onClick = onClose) { Text(tr("←  Back"), color = Lavender) }
-        Text(title, color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(title.uppercase(), color = Lavender, style = PixelLabelStyle)
         Spacer(Modifier.height(10.dp))
         voiceBar()
         Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             steps.indices.forEach { i ->
-                Box(
-                    Modifier.size(width = 22.dp, height = 5.dp).clip(CircleShape)
-                        .background(if (i <= index) Lavender else SurfaceElevated)
-                )
+                Box(Modifier.size(width = 22.dp, height = 8.dp).background(if (i <= index) Lavender else Border))
             }
         }
         Spacer(Modifier.weight(1f))
-        Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(24.dp)
-        ) {
-            Text(trf("Step %1\$d of %2\$d", index + 1, steps.size), color = Lavender, fontSize = 11.sp, letterSpacing = 1.2.sp)
+        Column(Modifier.fillMaxWidth()) {
+            PixelMoon(size = 44.dp, mood = if (last) MoonMood.HAPPY else MoonMood.SLEEPY, modifier = Modifier.clearAndSetSemantics {})
+            Spacer(Modifier.height(16.dp))
+            Text(trf("Step %1\$d of %2\$d", index + 1, steps.size).uppercase(), color = Lavender, style = PixelLabelStyle)
             Spacer(Modifier.height(8.dp))
-            Text(tr(step.title), color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            Text(tr(step.body), color = TextSecondary, fontSize = 15.sp, lineHeight = 23.sp)
+            Text(tr(step.title), color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(12.dp))
+            Text(tr(step.body), color = TextSecondary, fontSize = 16.sp, lineHeight = 25.sp)
         }
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -422,9 +454,9 @@ private fun StepSession(
 @Composable
 private fun VoiceBar(narrator: Narrator, on: Boolean, onChange: (Boolean) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(SurfaceColor).padding(horizontal = 14.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().quietCard(12.dp).padding(horizontal = 14.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(if (on) "🔊  " + tr("Voice guidance") else "🔈  " + tr("Voice guidance"), color = TextPrimary, fontSize = 14.sp)
+            Text(tr("VOICE GUIDANCE"), color = if (on) Lavender else TextSecondary, style = PixelLabelStyle)
             androidx.compose.material3.Switch(
                 checked = on, onCheckedChange = onChange,
                 colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Lavender, checkedThumbColor = Background)
@@ -437,6 +469,60 @@ private fun VoiceBar(narrator: Narrator, on: Boolean, onChange: (Boolean) -> Uni
             }
             VoiceStatus.UNAVAILABLE -> Text(tr("Voice guidance isn't available on this phone for this language."), color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
             else -> Unit
+        }
+    }
+}
+
+/** Cells of a pixel-drawn ring, on a grid 25 wide, for a ring of radius [r] cells. */
+private fun ringCells(r: Float): List<Pair<Int, Int>> = buildList {
+    val c = 12
+    for (y in 0..24) for (x in 0..24) {
+        val d = Math.hypot((x - c).toDouble(), (y - c).toDouble())
+        if (d >= r - 0.6 && d < r + 0.5) add(x to y)
+    }
+}
+
+/**
+ * The little moon breathes: it sits inside a ring of pixels that steps outwards as you breathe in and back in as
+ * you breathe out, with the phase and the seconds left written underneath. With animations off it simply shows the
+ * current step, so it works the same either way.
+ */
+@Composable
+private fun BreathingMoon(
+    size: Float,
+    running: Boolean,
+    finished: Boolean,
+    phaseLabel: String?,
+    secondsLeft: Int,
+    idleLabel: String
+) {
+    val ring = Lavender
+    // Quantise to whole ring sizes so it steps like a sprite: radius 6 (empty lungs) up to 11 (full).
+    val radius = 6f + kotlin.math.round(size.coerceIn(0f, 1f) * 5f)
+    val cells = remember(radius) { ringCells(radius) }
+    val inner = remember(radius) { ringCells(radius - 1.6f) }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(270.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val unit = kotlin.math.floor(this.size.width / 25f).coerceAtLeast(1f)
+                val origin = (this.size.width - unit * 25f) / 2f
+                val cellSize = androidx.compose.ui.geometry.Size(unit, unit)
+                inner.forEach { (x, y) ->
+                    drawRect(ring.copy(alpha = 0.20f), Offset(origin + x * unit, origin + y * unit), cellSize)
+                }
+                cells.forEach { (x, y) ->
+                    drawRect(ring, Offset(origin + x * unit, origin + y * unit), cellSize)
+                }
+            }
+            PixelMoon(size = 84.dp, mood = if (finished) MoonMood.HAPPY else MoonMood.SLEEPY, animated = !running)
+        }
+        Spacer(Modifier.height(10.dp))
+        if (phaseLabel != null) {
+            Text(phaseLabel.uppercase(), color = TextPrimary, style = PixelLabelStyle.copy(fontSize = 16.sp, letterSpacing = 3.sp))
+            Spacer(Modifier.height(4.dp))
+            Text("$secondsLeft", color = Lavender, style = PixelLabelStyle.copy(fontSize = 34.sp, letterSpacing = 0.sp), fontWeight = FontWeight.Bold)
+        } else {
+            Text(idleLabel.uppercase(), color = TextPrimary, style = PixelLabelStyle.copy(fontSize = 16.sp, letterSpacing = 3.sp))
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -113,14 +114,20 @@ internal fun InsightsScreen(
             .fillMaxSize()
             .background(Background),
         contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
+            start = 22.dp,
+            end = 22.dp,
             top = 18.dp,
-            bottom = 26.dp
+            bottom = 30.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(17.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
+            // The little moon reflects the week: smiling on a good one, gentle on a hard one.
+            PixelMoon(
+                size = 44.dp,
+                mood = weekly?.averageMood?.let { if (it >= 4.0) MoonMood.HAPPY else if (it <= 2.0) MoonMood.GENTLE else MoonMood.SLEEPY } ?: MoonMood.SLEEPY,
+                modifier = Modifier.padding(bottom = 12.dp).clearAndSetSemantics {}
+            )
             ScreenHeader(
                 eyebrow = tr("YOUR PERSONAL JOURNEY"),
                 title = tr("Your recent check-ins, in perspective"),
@@ -175,9 +182,7 @@ internal fun InsightsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceColor)
-                    .padding(19.dp)
+                    .flatSection()
             ) {
                 Text(
                     tr("Your mood over time"),
@@ -215,9 +220,7 @@ internal fun InsightsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceColor)
-                    .padding(19.dp)
+                    .flatSection()
             ) {
                 Text(
                     tr("Your wellbeing snapshot"),
@@ -428,9 +431,7 @@ internal fun WeeklySummaryCard(weekly: WeeklySummary) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(SurfaceColor)
-            .padding(19.dp)
+            .flatSection()
     ) {
         Text(tr("Your week"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(5.dp))
@@ -464,7 +465,7 @@ internal fun WeeklySummaryCard(weekly: WeeklySummary) {
 private fun PatternsSection(allRecords: List<CheckInRecord>, dismissed: Set<String>, onDismiss: (String) -> Unit) {
     val patterns = remember(allRecords) { findPatterns(allRecords) }.filter { it.id !in dismissed }
 
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(19.dp)) {
+    Column(Modifier.fillMaxWidth().flatSection()) {
         Text(tr("Patterns worth noticing"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(5.dp))
         Text(
@@ -515,7 +516,7 @@ private fun PatternRow(insight: PatternInsight, onDismiss: () -> Unit) {
 private fun ForecastCard(allRecords: List<CheckInRecord>) {
     val outcome = remember(allRecords) { evaluateForecast(allRecords.sortedBy { it.date }.map { it.mood }) }
 
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(19.dp)) {
+    Column(Modifier.fillMaxWidth().flatSection()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(tr("Mood outlook"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Text(tr("EXPERIMENTAL"), color = Lavender, fontSize = 9.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold)

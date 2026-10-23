@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -102,9 +103,6 @@ internal fun ProfileScreen(
     onHistoryClick: () -> Unit = {},
     onInsightsClick: () -> Unit,
     account: AccountViewModel,
-    memoryCount: Int = 0,
-    memorySince: Long? = null,
-    onClearMemory: () -> Unit = {},
     onPrivacyClick: () -> Unit = {},
     onDeleteAccount: suspend (String) -> String? = { null },
     onDeleteAccountWithGoogle: suspend () -> String? = { null },
@@ -120,12 +118,12 @@ internal fun ProfileScreen(
             .fillMaxSize()
             .background(Background),
         contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
+            start = 22.dp,
+            end = 22.dp,
             top = 18.dp,
             bottom = 30.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(17.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
             ScreenHeader(
@@ -139,24 +137,10 @@ internal fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(SurfaceColor)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .flatSection(),
+                horizontalAlignment = Alignment.Start
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(84.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceSelected),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "♡",
-                        color = Lavender,
-                        fontSize = 43.sp
-                    )
-                }
+                PixelMoon(size = 64.dp, mood = MoonMood.SLEEPY, modifier = Modifier.clearAndSetSemantics {})
 
                 Spacer(Modifier.height(15.dp))
 
@@ -165,7 +149,7 @@ internal fun ProfileScreen(
                     color = TextPrimary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Start
                 )
 
                 Spacer(Modifier.height(6.dp))
@@ -174,7 +158,7 @@ internal fun ProfileScreen(
                     email,
                     color = TextSecondary,
                     fontSize = 13.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Start
                 )
 
                 Spacer(Modifier.height(14.dp))
@@ -193,7 +177,7 @@ internal fun ProfileScreen(
 
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)
+                modifier = Modifier.fillMaxWidth().flatSection()
             ) {
                 Text(tr("Your activity"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(5.dp))
@@ -220,15 +204,13 @@ internal fun ProfileScreen(
 
         item { AppearanceCard() }
 
-        item { CompanionMemoryCard(memoryCount, memorySince, onClearMemory) }
-
         item { AppLockCard() }
 
         item { CrashReportsCard() }
 
         item {
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)
+                modifier = Modifier.fillMaxWidth().flatSection()
             ) {
                 Text(tr("Account details"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
@@ -294,7 +276,7 @@ private fun AppInfoCard() {
     val version = remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "—"
     }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SurfaceColor).padding(20.dp)) {
+    Column(Modifier.fillMaxWidth().flatSection()) {
         Text(tr("About this app"), color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         Text(tr("VERSION"), color = TextSecondary, fontSize = 10.sp, letterSpacing = 1.2.sp)
@@ -307,7 +289,8 @@ private fun AppInfoCard() {
         )
         TextButton(onClick = {
             val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
-                data = android.net.Uri.parse("mailto:")
+                data = android.net.Uri.parse("mailto:$FEEDBACK_EMAIL")
+                putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL))
                 putExtra(android.content.Intent.EXTRA_SUBJECT, "MindTrack feedback (v$version)")
             }
             runCatching { context.startActivity(intent) }
@@ -329,6 +312,7 @@ private fun EditNameDialog(current: String, onDismiss: () -> Unit, onSave: suspe
         text = {
             Column {
                 androidx.compose.material3.OutlinedTextField(
+        colors = quietFieldColors(),
                     value = name,
                     onValueChange = { if (it.length <= 100) { name = it; error = null } },
                     singleLine = true,
@@ -354,3 +338,6 @@ private fun EditNameDialog(current: String, onDismiss: () -> Unit, onSave: suspe
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(tr("Cancel"), color = TextSecondary) } }
     )
 }
+
+/** Where "Send feedback" is addressed, so nobody has to type it. */
+internal const val FEEDBACK_EMAIL = "shubhsingh.14185@gmail.com"

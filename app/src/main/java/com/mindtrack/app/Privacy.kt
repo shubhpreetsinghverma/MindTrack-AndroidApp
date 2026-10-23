@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -101,11 +102,12 @@ internal fun hasConsented(prefs: android.content.SharedPreferences, uid: String?
 internal fun PrivacyPolicyScreen(onBack: () -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Background),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 30.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
             TextButton(onClick = onBack) { Text(tr("←  Back"), color = Lavender) }
+            PixelMoon(size = 44.dp, modifier = Modifier.padding(bottom = 10.dp).clearAndSetSemantics {})
             ScreenHeader(
                 eyebrow = tr("YOUR PRIVACY"),
                 title = tr("Privacy policy"),
@@ -113,12 +115,10 @@ internal fun PrivacyPolicyScreen(onBack: () -> Unit) {
             )
         }
         items(if (Lang.current == AppLanguage.HINDI) privacyPolicyHindi else privacyPolicy) { section ->
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(SurfaceColor).padding(18.dp)
-            ) {
-                Text(section.title, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(7.dp))
-                Text(section.body, color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp)
+            HomeSection {
+                Text(section.title, color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(8.dp))
+                Text(section.body, color = TextSecondary, fontSize = 14.sp, lineHeight = 22.sp)
             }
         }
     }
@@ -147,9 +147,11 @@ internal fun ConsentGate(uid: String?, content: @Composable () -> Unit) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(tr("BEFORE YOU BEGIN"), color = Lavender, fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.SemiBold)
+            PixelMoon(size = 56.dp, mood = MoonMood.SLEEPY, modifier = Modifier.clearAndSetSemantics {})
+            Spacer(Modifier.height(16.dp))
+            Text(tr("BEFORE YOU BEGIN"), color = Lavender, style = PixelLabelStyle)
             Spacer(Modifier.height(10.dp))
-            Text(tr("Your reflections are yours."), color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold, lineHeight = 34.sp)
+            Text(tr("Your reflections are yours."), color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Medium, lineHeight = 34.sp)
             Spacer(Modifier.height(14.dp))
             Text(
                 tr("MindTrack saves your check-ins to your private account so they follow you across devices. Messages to the companion, with your recent ratings (not your journal notes), are processed by Google's Gemini AI. You can export or delete everything at any time."),
@@ -180,8 +182,8 @@ internal fun ConsentGate(uid: String?, content: @Composable () -> Unit) {
                     consented = true
                 },
                 enabled = checked,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Lavender, contentColor = Background)
             ) { Text(tr("Continue"), fontWeight = FontWeight.Bold) }
         }

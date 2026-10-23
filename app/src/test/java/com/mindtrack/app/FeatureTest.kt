@@ -340,17 +340,36 @@ class ChatStoreTest {
 class ThemeTest {
     @After fun reset() { ThemeState.mode = ThemeMode.SYSTEM; ThemeState.systemDark = true }
 
-    @Test fun lightThemeIsWhiteAndLavender() {
+    @Test fun lightThemeIsWarmPaperAndLavender() {
         ThemeState.mode = ThemeMode.LIGHT
-        assertEquals(androidx.compose.ui.graphics.Color(0xFFFBFAFF), Background)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFFF8F6F1), Background)
         assertTrue(Lavender.red < 0.5f && Lavender.blue > 0.7f)        // a lavender/violet accent
         assertFalse(ThemeState.isDark)
     }
 
-    @Test fun darkThemeKeepsTheOriginalNavy() {
+    @Test fun darkThemeIsDeepInk() {
         ThemeState.mode = ThemeMode.DARK
-        assertEquals(androidx.compose.ui.graphics.Color(0xFF090D1B), Background)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF12121C), Background)
         assertTrue(ThemeState.isDark)
+    }
+
+    /** WCAG contrast ratio between two colours. */
+    private fun contrast(a: androidx.compose.ui.graphics.Color, b: androidx.compose.ui.graphics.Color): Double {
+        fun lum(c: androidx.compose.ui.graphics.Color): Double {
+            fun ch(v: Float) = v.toDouble().let { if (it <= 0.03928) it / 12.92 else Math.pow((it + 0.055) / 1.055, 2.4) }
+            return 0.2126 * ch(c.red) + 0.7152 * ch(c.green) + 0.0722 * ch(c.blue)
+        }
+        val hi = maxOf(lum(a), lum(b)); val lo = minOf(lum(a), lum(b))
+        return (hi + 0.05) / (lo + 0.05)
+    }
+
+    @Test fun textAndAccentsAreReadableOnBothBackgrounds() {
+        listOf(DarkPalette, LightPalette).forEach { p ->
+            assertTrue("primary text", contrast(p.textPrimary, p.background) >= 7.0)
+            assertTrue("secondary text", contrast(p.textSecondary, p.background) >= 4.5)
+            assertTrue("accent text", contrast(p.lavender, p.background) >= 4.5)
+            assertTrue("secondary text on cards", contrast(p.textSecondary, p.surface) >= 4.5)
+        }
     }
 
     @Test fun autoFollowsThePhone() {
@@ -414,7 +433,7 @@ class BreathPhaseIndexTest {
     }
 
     @Test fun everyIntroHasAHindiVersion() {
-        val hindi = hindiStrings + hindiLongStrings
+        val hindi = hindiAll
         breathingPatterns.forEach { assertTrue("no Hindi intro for ${it.name}", hindi.containsKey(it.intro.replace("\"", "\\\""))) }
         (groundingSteps + relaxationSteps).forEach {
             assertTrue("no Hindi title: ${it.title}", hindi.containsKey(it.title))

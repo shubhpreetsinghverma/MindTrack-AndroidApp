@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -44,7 +46,7 @@ class UiTests {
     @After fun tearDown() {
         Lang.current = AppLanguage.ENGLISH
         ThemeState.mode = ThemeMode.SYSTEM
-        ChatStore.forUser(app, testUid).clear()
+        ConversationStore.forUser(app, testUid).clearAll()
         settingsPrefs(app).edit { remove("consent_v${POLICY_VERSION}_$testUid") }
         userPrefs(app, testUid).edit { clear() }
     }
@@ -149,31 +151,59 @@ class UiTests {
 
     @Test fun exercises_offerAVoiceGuidanceSwitch() {
         show { ExercisesScreen(onBack = {}) }
-        rule.onNodeWithText("Voice guidance", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Voice guidance", substring = true, ignoreCase = true).assertIsDisplayed()
     }
 
     private fun breathingRun() {
         show { ExercisesScreen(onBack = {}) }
         rule.onNodeWithText("Box breathing").performClick()
-        rule.onNodeWithText("Ready?").assertIsDisplayed()
+        rule.onNodeWithText("Ready?", ignoreCase = true).assertIsDisplayed()
         // Drive the animation clock by hand so the timing is exact.
         rule.mainClock.autoAdvance = false
         rule.onNodeWithText("Start").performClick()
         rule.mainClock.advanceTimeBy(1_000)
-        rule.onNodeWithText("Breathe in").assertIsDisplayed()
+        rule.onNodeWithText("Breathe in", ignoreCase = true).assertIsDisplayed()
         rule.mainClock.advanceTimeBy(4_000)
-        rule.onNodeWithText("Hold").assertIsDisplayed()
+        rule.onNodeWithText("Hold", ignoreCase = true).assertIsDisplayed()
         rule.onNodeWithText("Pause").performClick()
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithText("Resume").assertIsDisplayed()
     }
 
+    @Test fun verifyEmail_explainsAndOffersEveryWayForward() {
+        var checked = 0; var resent = 0; var signedOut = 0
+        show {
+            VerifyEmailContent(
+                email = "sam@example.com", status = null, busy = false, resendCooldown = 0,
+                onCheck = { checked++ }, onResend = { resent++ }, onSignOut = { signedOut++ }
+            )
+        }
+        rule.onNodeWithText("Check your email").assertIsDisplayed()
+        rule.onNodeWithText("We sent a verification link to sam@example.com", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("I've verified").performClick()
+        rule.onNodeWithText("Resend email").performClick()
+        rule.onNodeWithText("Use a different account").performClick()
+        assertEquals(listOf(1, 1, 1), listOf(checked, resent, signedOut))
+    }
+
+    @Test fun verifyEmail_resendIsDisabledWhileCoolingDown() {
+        show {
+            VerifyEmailContent(
+                email = "sam@example.com", status = null, busy = false, resendCooldown = 12,
+                onCheck = {}, onResend = {}, onSignOut = {}
+            )
+        }
+        rule.onNodeWithText("Resend email (12)").assertIsNotEnabled()
+    }
+
     @Test fun grounding_walksThroughFiveSteps() {
         show { ExercisesScreen(onBack = {}) }
+        // The cards now carry a "good for" note, so the list needs scrolling to reach this one.
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText("5-4-3-2-1 grounding"))
         rule.onNodeWithText("5-4-3-2-1 grounding").performClick()
-        rule.onNodeWithText("Step 1 of 5").assertIsDisplayed()
+        rule.onNodeWithText("Step 1 of 5", ignoreCase = true).assertIsDisplayed()
         repeat(4) { rule.onNodeWithText("Next").performClick() }
-        rule.onNodeWithText("Step 5 of 5").assertIsDisplayed()
+        rule.onNodeWithText("Step 5 of 5", ignoreCase = true).assertIsDisplayed()
         rule.onNodeWithText("Finish").assertIsDisplayed()
     }
 
@@ -184,7 +214,7 @@ class UiTests {
         show { CompanionScreen(vm = vm, records = emptyList(), streak = 0) }
         rule.onNodeWithText("Your companion").assertIsDisplayed()
         rule.onNode(hasSetTextAction()).performTextInput("hi")
-        rule.onNodeWithText("Send message  →").performClick()
+        rule.onNodeWithContentDescription("Send message").performClick()
         rule.waitForIdle()
         assertEquals(3, vm.messages.size)                 // welcome, "hi", local reply
         assertTrue(vm.messages.last().text.isNotBlank() && !vm.messages.last().isUser)
@@ -195,10 +225,75 @@ class UiTests {
         val vm = CompanionViewModel(app, testUid)
         show { CompanionScreen(vm = vm, records = emptyList(), streak = 0) }
         rule.onNode(hasSetTextAction()).performTextInput("thanks")
-        rule.onNodeWithText("Send message  →").performClick()
+        rule.onNodeWithContentDescription("Send message").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("Chat history").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("New chat").performClick()
         rule.waitForIdle()
+        assertEquals(1, vm.messages.size)
+    }
+
+    @Test fun home_showsAPatternOnlyWhenThereIsEnoughData() {
+        val start = LocalDate.now().minusDays(25)
+        val many = (0 until 20).map { i ->
+            val tagged = i % 2 == 0
+            CheckInRecord(start.plusDays(i.toLong()).toString(), if (tagged) 5 else 2, if (tagged) 2 else 4, if (tagged) 4 else 2, "", if (tagged) listOf("Exercise") else emptyList())
+        }
+        var insights = 0
+        show {
+            HomeScreen(
+                today = LocalDate.now(), mood = 3, checkedIn = false, records = many, allRecords = many,
+                onInsightsClick = { insights++ }, onCheckInClick = {}, onResourcesClick = {}, onGuideClick = {}
+            )
+        }
+        rule.onNodeWithText("A PATTERN WE NOTICED").assertIsDisplayed()
+        rule.onNodeWithText("See all patterns  →").performClick()
+        assertEquals(1, insights)
+        rule.onNodeWithText("Breathe and ground").assertDoesNotExist()   // the shortcut was removed from Home
+    }
+
+    @Test fun home_hidesThePatternWithTooFewCheckIns() {
+        val few = listOf(record(LocalDate.now().minusDays(1)))
+        show {
+            HomeScreen(
+                today = LocalDate.now(), mood = 3, checkedIn = false, records = few, allRecords = few,
+                onCheckInClick = {}, onResourcesClick = {}, onGuideClick = {}
+            )
+        }
+        rule.onNodeWithText("A PATTERN WE NOTICED").assertDoesNotExist()
+    }
+
+    @Test fun companion_reopensTheLatestSavedChatWithoutCrashing() {
+        // Regression: opening a saved chat while the ViewModel was still being built crashed the app.
+        val store = ConversationStore.forUser(app, testUid)
+        val now = System.currentTimeMillis()
+        store.save(Conversation(now.toString(), listOf(
+            ChatMessage("You", "I felt anxious today", true, now - 1_000),
+            ChatMessage("MindTrack", "Thanks for telling me.", false, now)
+        )))
+        val vm = CompanionViewModel(app, testUid)
+        assertEquals(now.toString(), vm.currentId)
+        assertEquals(3, vm.messages.size)   // welcome plus the two saved messages
+        assertEquals(1, vm.conversations.size)
+    }
+
+    @Test fun companion_sidebarListsChatsAndCanDeleteThemAll() {
+        val vm = CompanionViewModel(app, testUid)
+        show { CompanionScreen(vm = vm, records = emptyList(), streak = 0) }
+        rule.onNode(hasSetTextAction()).performTextInput("thanks")
+        rule.onNodeWithContentDescription("Send message").performClick()
+        rule.waitForIdle()
+        assertEquals(1, vm.conversations.size)
+
+        rule.onNodeWithContentDescription("Chat history").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Chats").assertIsDisplayed()
+        rule.onNodeWithText("Deletes in 7 days", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Delete all chats").performClick()
+        rule.onAllNodesWithText("Delete")[0].performClick()   // the confirmation button
+        rule.waitForIdle()
+        assertEquals(0, vm.conversations.size)
         assertEquals(1, vm.messages.size)
     }
 

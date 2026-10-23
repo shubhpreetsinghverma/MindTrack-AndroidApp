@@ -39,14 +39,14 @@ class TranslationTest {
     }
 
     @Test fun everyTranslatedStringInTheCodeHasAHindiVersion() {
-        val translated = (hindiStrings + hindiLongStrings).keys.map { unescape(it) }.toSet()
+        val translated = hindiAll.keys.map { unescape(it) }.toSet()
         val skip = setOf("MindTrack", "✳ MindTrack", "")
         val missing = sourceKeys().filter { it !in translated && it !in skip && it.any(Char::isLetter) }
         assertTrue("Missing Hindi for: ${missing.take(15)}", missing.isEmpty())
     }
 
     @Test fun hindiKeepsTheSamePlaceholdersAsEnglish() {
-        (hindiStrings + hindiLongStrings).forEach { (english, hindi) ->
+        hindiAll.forEach { (english, hindi) ->
             val e = placeholder.findAll(unescape(english)).map { it.value }.toSet()
             val h = placeholder.findAll(hindi).map { it.value }.toSet()
             assertEquals("Placeholders differ for: $english", e, h)

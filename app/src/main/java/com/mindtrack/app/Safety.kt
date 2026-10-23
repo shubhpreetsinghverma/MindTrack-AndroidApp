@@ -1,5 +1,6 @@
 package com.mindtrack.app
 
+import androidx.compose.ui.draw.drawBehind
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -33,6 +34,10 @@ internal val helplines = listOf(
     Helpline("INDIA · EMERGENCY", "National emergency number", "112", "112", null),
     Helpline("US & CANADA", "988 Suicide & Crisis Lifeline", "988", "988 (call or text)", "https://988lifeline.org/"),
     Helpline("UK & IRELAND", "Samaritans (24/7)", "116123", "116 123", "https://www.samaritans.org/"),
+    Helpline("INDIA · WOMEN", "Women Helpline (24/7)", "181", "181", null),
+    Helpline("INDIA · CHILDREN", "Childline (24/7)", "1098", "1098", "https://www.childlineindia.org/"),
+    Helpline("US · SEXUAL ASSAULT", "RAINN National Hotline", "18006564673", "1-800-656-4673", "https://www.rainn.org/"),
+    Helpline("UK · SEXUAL ABUSE", "Rape Crisis helpline", "08088029999", "0808 802 9999", "https://rapecrisis.org.uk/"),
     Helpline("ANYWHERE ELSE", "Find a helpline in your country", null, "findahelpline.com", "https://findahelpline.com/")
 )
 
@@ -55,6 +60,44 @@ internal object CrisisSupport {
         val normalised = text.lowercase().replace('’', '\'')
         return phrases.any { it in normalised }
     }
+
+    // Abuse, assault and harassment are a different kind of emergency from self-harm, so they get their own
+    // wording and helplines. Whole-word matching keeps words like "grape" and "scrape" from setting it off.
+    private val abuseWords: List<Regex> = listOf(
+        """\braped\b""", """\braping\b""", """\brapist\b""", """\bmolest(ed|ing|s)?\b""", """\bgroped?\b""",
+        """\bsexual(ly)? (assault|abus|harass|violen)\w*""",
+        """\b(physical|domestic|emotional) (abuse|violence)\b""",
+        """\b(assault|abus|beat|hit)(ed|s|ing)? me\b""",
+        """\b(is|was|been|being|keeps|kept) (hitting|beating|abusing|hurting|touching|molesting|threatening) me\b""",
+        """\bbeing abused\b""", """\bblackmail(ed|ing)? me\b""", """\bstalk(ed|ing|s) me\b""",
+        """\bafraid of my (husband|wife|partner|father|mother|boyfriend|girlfriend|boss|teacher|uncle|brother)\b""",
+        """\b(not|isn't|unsafe) safe (at|in) (home|my house)\b"""
+    ).map { Regex(it, RegexOption.IGNORE_CASE) }
+
+    private val abuseHindi = listOf(
+        "बलात्कार", "रेप", "यौन शोषण", "यौन उत्पीड़न", "यौन उत्पीडन", "छेड़छाड़", "छेड़खानी", "घरेलू हिंसा",
+        "मारपीट", "मुझे मारता", "मुझे मारती", "मुझे पीटता", "मुझे पीटती", "मुझे छूता", "मुझे छूती", "ब्लैकमेल"
+    )
+
+    fun needsAbuseSupport(text: String): Boolean {
+        val normalised = text.replace('’', '\'')
+        return abuseWords.any { it.containsMatchIn(normalised) } || abuseHindi.any { it in normalised }
+    }
+
+    /** Any message that should always bring real-world help, whatever the AI says next. */
+    fun needsAnySupport(text: String): Boolean = needsSupport(text) || needsAbuseSupport(text)
+
+    const val ABUSE_CHAT_MESSAGE_EN =
+        "I'm so sorry this happened to you, and I'm glad you told me. What happened is not your fault, and you deserve to be safe and supported. " +
+            "If you are in danger right now, please call your local emergency number (112 in India, 911 in the US, 999 in the UK).\n\n" +
+            "You can talk in confidence to someone trained to help:\n" +
+            "• India: Women Helpline 181 · Childline 1098 · Police 112\n" +
+            "• US: RAINN 1-800-656-4673\n" +
+            "• UK: Rape Crisis 0808 802 9999\n" +
+            "• Elsewhere: findahelpline.com\n\n" +
+            "You decide what to share and when. I'm here, and happy to keep listening."
+
+    val abuseChatMessage: String get() = tr(ABUSE_CHAT_MESSAGE_EN)
 
     const val CHAT_MESSAGE_EN =
         "I'm really glad you told me, and I'm concerned about how much pain you may be in. " +
@@ -83,28 +126,26 @@ internal fun openLink(context: Context, url: String) {
 internal fun HelplineList(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Column(modifier) {
-        helplines.forEachIndexed { index, line ->
-            if (index > 0) Spacer(Modifier.height(8.dp))
+        helplines.forEach { line ->
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(SurfaceElevated)
-                    .clickable {
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button) {
                         when {
                             line.dial != null -> openDialer(context, line.dial)
                             line.url != null -> openLink(context, line.url)
                         }
                     }
-                    .padding(14.dp)
+                    .drawBehind { drawLine(Border, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), strokeWidth = 1.dp.toPx()) }
+                    .padding(vertical = 14.dp)
             ) {
-                Text(tr(line.region), color = Lavender, fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(3.dp))
-                Text(tr(line.name), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(tr(line.region), color = Lavender, style = PixelLabelStyle)
+                Spacer(Modifier.height(4.dp))
+                Text(tr(line.name), color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(2.dp))
                 Text(
                     if (line.dial != null) trf("Tap to call  ·  %1\$s", tr(line.display)) else trf("Tap to open  ·  %1\$s", tr(line.display)),
-                    color = TextSecondary, fontSize = 12.sp
+                    color = TextSecondary, fontSize = 13.sp
                 )
             }
         }

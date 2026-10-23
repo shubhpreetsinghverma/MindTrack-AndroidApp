@@ -74,7 +74,7 @@ private fun pick(options: List<String>, seed: String) = options[Math.floorMod(se
 
 /** Returns a ready-made reply, or null when the message should go to the AI. */
 internal fun trivialReply(message: String): String? {
-    if (CrisisSupport.needsSupport(message)) return null
+    if (CrisisSupport.needsAnySupport(message)) return null
     val text = normalise(message)
     val hindi = Lang.current == AppLanguage.HINDI
     if (text.isEmpty() || text.length > 30) return null

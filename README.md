@@ -95,5 +95,8 @@ Look and feel live in `Theme.kt` (palettes), `Components.kt` (shared pieces), `P
 ## More documents
 `PRIVACY_POLICY.md`, `DATA_SAFETY.md` (Play Console answers) and `CRISIS_REVIEW.md` (sheet for a counsellor to review the safety wording).
 
+## Licence
+MIT. See `LICENSE`. The font under `licenses/` keeps its own licence.
+
 ## Credits
 Pixelify Sans by The Pixelify Sans Project Authors, used under the SIL Open Font License 1.1 (see `licenses/PixelifySans-OFL.txt`).
